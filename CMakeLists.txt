@@ -12,10 +12,11 @@ file(GLOB_RECURSE PROJECT_SHADERS src/shaders/*.vert src/shaders/*.frag src/shad
 
 add_executable(${PROJECT_NAME} ${PROJECT_HEADERS} ${PROJECT_SOURCES} ${PROJECT_SHADERS})
 
-find_package(OpenGL REQUIRED)
-find_package(GLFW3 REQUIRED)
-target_link_libraries(${PROJECT_NAME} PUBLIC OpenGL ${GLFW3_LIBRARY})
+# SDL2
+find_package(SDL2 REQUIRED)
+target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIR})
 
+# GLAD
 set(GLAD_DIR deps/glad)
 add_library(glad ${GLAD_DIR}/src/glad.c)
 target_include_directories(glad PUBLIC ${GLAD_DIR}/include)
@@ -31,14 +32,14 @@ set(IMGUI_DIR deps/imgui-1.65)
 add_library(imgui
         ${IMGUI_DIR}/imgui.cpp
         ${IMGUI_DIR}/imgui_draw.cpp
-        ${IMGUI_DIR}/imgui_demo.cpp
-        ${IMGUI_DIR}/examples/imgui_impl_glfw.cpp
+        ${IMGUI_DIR}/imgui_widgets.cpp
+        ${IMGUI_DIR}/examples/imgui_impl_sdl.cpp
         ${IMGUI_DIR}/examples/imgui_impl_opengl3.cpp)
-target_include_directories(imgui PUBLIC ${GLFW3_INCLUDE_DIR})
+target_include_directories(imgui PUBLIC ${SDL2_INCLUDE_DIR})
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
 target_include_directories(imgui PUBLIC ${IMGUI_DIR}/examples)
 target_link_libraries(imgui PRIVATE glad)
-target_link_libraries(imgui PRIVATE ${GLFW3_LIBRARY})
+target_link_libraries(imgui PRIVATE SDL2)
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 
 # STB
@@ -49,3 +50,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
 set(EIGEN_DIR deps/eigen-3.3.5)
 target_include_directories(${PROJECT_NAME} PRIVATE ${EIGEN_DIR})
 
+# Handmade Math
+set(HMM_DIR deps/HandmadeMath)
+target_include_directories(${PROJECT_NAME} PRIVATE ${HMM_DIR})

@@ -36,4 +36,5 @@ inline float radians(float deg) {
 inline float degrees(float rad) {
     return rad * 180 / M_PI;
 }
+
 #endif //FLUID_SIM_UTILS_H
