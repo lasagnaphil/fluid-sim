@@ -4,6 +4,7 @@
 #include <iostream>
 #include "log.h"
 #include "Eigen/Core"
+#include "WaterSim.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -36,14 +37,9 @@ int main() {
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    using Eigen::MatrixXd;
-
-    MatrixXd m(2, 2);
-    m(0, 0) = 3;
-    m(1, 0) = 2.5;
-    m(0, 1) = -1;
-    m(1, 1) = m(1, 0) + m(0, 1);
-    std::cout << m << std::endl;
+    WaterSim waterSim;
+    waterSim.setup();
+    waterSim.runFrame();
 
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
