@@ -19,63 +19,6 @@ void WaterSim::setup() {
     });
 }
 
-void WaterSim::setupDraw(FirstPersonCamera* camera) {
-
-    const auto EMPTY_COLOR = HMM_Vec4(1.0f, 1.0f, 1.0f, 0.1f);
-    const auto FLUID_COLOR = HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-    const auto SOLID_COLOR = HMM_Vec4(0.5f, 0.5f, 0.5f, 1.0f);
-
-    iterate([&](size_t i, size_t j, size_t k) {
-        CellType cellType = cell(i, j, k);
-        if (cellType == CellType::EMPTY) {
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = EMPTY_COLOR;
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = EMPTY_COLOR;
-        }
-        else if (cellType == CellType::FLUID) {
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = FLUID_COLOR;
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = FLUID_COLOR;
-        }
-        else if (cellType == CellType::SOLID) {
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = SOLID_COLOR;
-            vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = SOLID_COLOR;
-        }
-    });
-
-    shader = Shader::create("assets/shaders/lines.vert", "assets/shaders/lines.frag");
-    glGenVertexArrays(1, &lineVAO);
-    glGenVertexArrays(1, &pointVAO);
-    glGenBuffers(1, &lineVBO);
-    glGenBuffers(1, &lineTypeVBO);
-
-    glBindVertexArray(lineVAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * LINE_VERTEX_COUNT, vertices, GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(hmm_vec3), 0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, lineTypeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec4) * LINE_VERTEX_COUNT, vertexColors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(hmm_vec4), 0);
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(pointVAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2*sizeof(hmm_vec3), 0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, lineTypeVBO);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 2*sizeof(hmm_vec4), 0);
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
-
-    shader.use();
-    shader.setMatrix4("model", HMM_Mat4d(1.0));
-    camera->addShader(&shader);
-}
-
 Eigen::Vector3d WaterSim::clampPos(Eigen::Vector3d x) {
     Eigen::Vector3d clamped;
     clamped(0) = clamp(x(0), 0.0, (double)SIZEX);
@@ -85,47 +28,16 @@ Eigen::Vector3d WaterSim::clampPos(Eigen::Vector3d x) {
 }
 
 void WaterSim::runFrame() {
-    // applyAdvection();
+    applyAdvection();
     applyGravity();
-    // applyProjection();
+    applyProjection();
 }
 
 void WaterSim::update() {
     auto inputMgr = InputManager::get();
-    if (inputMgr->isKeyEntered(SDL_SCANCODE_1)) {
-        drawMode = DrawMode::POINT;
+    if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
+        runFrame();
     }
-    else if (inputMgr->isKeyEntered(SDL_SCANCODE_2)) {
-        drawMode = DrawMode::LINE;
-    }
-
-    iterate([&](size_t i, size_t j, size_t k) {
-        Eigen::Vector3d dir_d = vel(i, j, k);
-        hmm_vec3 dir = HMM_Vec3((float)dir_d(0), (float)dir_d(1), (float)dir_d(2));
-        vertices[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)]
-                = CELL_SIZE * HMM_Vec3(i, j, k);
-        vertices[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1]
-                = CELL_SIZE * HMM_Vec3(i, j, k) + VEL_LINE_SCALE * dir;
-    });
-
-    glBindVertexArray(lineVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec3) * LINE_VERTEX_COUNT, vertices);
-    glBindVertexArray(0);
-}
-
-void WaterSim::draw() {
-    shader.use();
-
-    if (drawMode == DrawMode::POINT) {
-        glBindVertexArray(pointVAO);
-        glDrawArrays(GL_POINTS, 0, POINT_VERTEX_COUNT);
-    }
-    else if (drawMode == DrawMode::LINE) {
-        glBindVertexArray(lineVAO);
-        glDrawArrays(GL_LINES, 0, LINE_VERTEX_COUNT);
-    }
-    glBindVertexArray(0);
 }
 
 void WaterSim::debugPrint() {
@@ -147,7 +59,8 @@ void WaterSim::applyAdvection() {
         Vector3d x_mid = u_pos - 0.5 * dt * velU(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = u_pos - dt * velInterp(x_mid_cl);
-        u(i,j,k) = velInterpU(x_p);
+        double vInterp = velInterpU(x_p);
+        u(i,j,k) = vInterp;
     });
     iterateV([&](size_t i, size_t j, size_t k) {
         Vector3d v_pos = Vector3d(i, (double)j - 0.5, k);
@@ -189,15 +102,15 @@ void WaterSim::applyProjection() {
     double scaleA = dt / (rho * dx * dx);
     iterate([&](size_t i, size_t j, size_t k) {
         if (cell(i,j,k) == CellType::FLUID) {
-            if (cell(i+1,j,k) == CellType::FLUID) {
+            if (i == SIZEX - 1 || cell(i+1,j,k) == CellType::EMPTY) {
+                Adiag(i,j,k) += scaleA;
+            }
+            else if (cell(i+1,j,k) == CellType::FLUID) {
                 Adiag(i,j,k) += scaleA;
                 Adiag(i+1,j,k) += scaleA;
                 Aplusi(i,j,k) -= scaleA;
             }
-            else if (cell(i+1,j,k) == CellType::EMPTY) {
-                Adiag(i,j,k) += scaleA;
-            }
-            if (cell(i,j+1,k) == CellType::FLUID) {
+            if (j == SIZEY - 1 || cell(i,j+1,k) == CellType::FLUID) {
                 Adiag(i,j,k) += scaleA;
                 Adiag(i,j+1,k) += scaleA;
                 Aplusj(i,j,k) -= scaleA;
@@ -205,7 +118,7 @@ void WaterSim::applyProjection() {
             else if (cell(i,j+1,k) == CellType::EMPTY) {
                 Adiag(i,j,k) += scaleA;
             }
-            if (cell(i,j,k+1) == CellType::FLUID) {
+            if (k == SIZEZ - 1 || cell(i,j,k+1) == CellType::FLUID) {
                 Adiag(i,j,k) += scaleA;
                 Adiag(i,j,k+1) += scaleA;
                 Aplusk(i,j,k) -= scaleA;
@@ -218,28 +131,34 @@ void WaterSim::applyProjection() {
     // calculate rhs
     double scaleRHS = 1 / dx;
     iterate([&](size_t i, size_t j, size_t k) {
+        size_t ip = i == SIZEX - 1? i : i + 1;
+        size_t im = i == 0? i : i - 1;
+        size_t jp = j == SIZEY - 1? j : j + 1;
+        size_t jm = j == 0? j : j - 1;
+        size_t kp = k == SIZEY - 1? k : k + 1;
+        size_t km = k == 0? k : k - 1;
         rhs(i, j, k) =
                 (u(i + 1, j, k) - u(i, j, k) + v(i, j + 1, k) - v(i, j, k) + w(i, j, k + 1) - w(i, j, k)) / dx;
         // modify rhs to account for solid velocities
         if (cell(i, j, k) == CellType::SOLID) {
             // TODO: use usolid, vsolid, wsolid instead of 0
-            if (cell(i - 1, j, k) == CellType::SOLID) {
-                rhs(i, j, k) -= scaleRHS * (u(i, j, k) - 0);
+            if (cell(im,j,k) == CellType::SOLID) {
+                rhs(i,j,k) -= scaleRHS * (u(i,j,k) - 0);
             }
-            if (cell(i + 1, j, k) == CellType::SOLID) {
-                rhs(i, j, k) += scaleRHS * (u(i + 1, j, k) - 0);
+            if (cell(ip,j,k) == CellType::SOLID) {
+                rhs(i,j,k) += scaleRHS * (u(i+1,j,k) - 0);
             }
-            if (cell(i, j - 1, k) == CellType::SOLID) {
-                rhs(i, j, k) -= scaleRHS * (v(i, j, k) - 0);
+            if (cell(i,jm,k) == CellType::SOLID) {
+                rhs(i,j,k) -= scaleRHS * (v(i,j,k) - 0);
             }
-            if (cell(i, j + 1, k) == CellType::SOLID) {
-                rhs(i, j, k) += scaleRHS * (v(i, j + 1, k) - 0);
+            if (cell(i,jp,k) == CellType::SOLID) {
+                rhs(i,j,k) += scaleRHS * (v(i,j+1,k) - 0);
             }
-            if (cell(i, j, k - 1) == CellType::SOLID) {
-                rhs(i, j, k) -= scaleRHS * (w(i, j, k) - 0);
+            if (cell(i, j, km) == CellType::SOLID) {
+                rhs(i,j,k) -= scaleRHS * (w(i,j,k) - 0);
             }
-            if (cell(i, j, k + 1) == CellType::SOLID) {
-                rhs(i, j, k) += scaleRHS * (w(i, j, k + 1) - 0);
+            if (cell(i,j,kp) == CellType::SOLID) {
+                rhs(i,j,k) += scaleRHS * (w(i,j,k+1) - 0);
             }
         }
     });
@@ -288,6 +207,32 @@ void WaterSim::applyProjection() {
 
         iter++;
     }
+
+    // update velocity using the solved pressure
+    iterate([&](size_t i, size_t j, size_t k) {
+        double scale = dt / (rho * dx);
+        if (cell(i,j,k) == CellType::FLUID) {
+            u(i,j,k) -= scale * p(i,j,k);
+            u(i+1,j,k) += scale * p(i,j,k);
+            v(i,j,k) -= scale * p(i,j,k);
+            v(i,j+1,k) += scale * p(i,j,k);
+            w(i,j,k) -= scale * p(i,j,k);
+            w(i,j,k+1) += scale * p(i,j,k);
+        }
+    });
+
+    iterate([&](size_t i, size_t j, size_t k) {
+        // TODO: replace zero with solid velocity
+        if (cell(i,j,k) == CellType::SOLID) {
+            u(i,j,k) = 0.0; // usolid(i,j,k)
+            // u(i+1,j,k) = 0.0; // usolid(i+1,j,k)
+            v(i,j,k) = 0.0; // vsolid(i,j,k)
+            // v(i,j+1,k) = 0.0; // vsolid(i,j+1,k)
+            w(i,j,k) = 0.0; // wsolid(i,j,k)
+            // w(i,j,k+1) = 0.0; // wsolid(i,j,k+1)
+        }
+    });
+
 }
 
 WaterSim::Grid3D<double> WaterSim::applyA(const WaterSim::Grid3D<double> &r, const WaterSim::Grid3D<double> &Adiag,
@@ -296,9 +241,13 @@ WaterSim::Grid3D<double> WaterSim::applyA(const WaterSim::Grid3D<double> &r, con
                                           const WaterSim::Grid3D<double> &Aplusk) {
     Grid3D<double> z;
     iterate([&](size_t i, size_t j, size_t k) {
-        z(i,j,k) = Adiag(i,j,k)*r(i,j,k) + Aplusi(i-1,j,k)*r(i-1,j,k) + Aplusi(i,j,k)*r(i+1,j,k)
-                   + Aplusj(i,j-1,k)*r(i,j-1,k) + Aplusj(i,j,k)*r(i,j+1,k)
-                   + Aplusk(i,j,k-1)*r(i,j,k-1) + Aplusk(i,j,k)*r(i,j,k+1);
+        z(i,j,k) = Adiag(i,j,k)*r(i,j,k)
+                   + (i > 0? Aplusi(i-1,j,k)*r(i-1,j,k) : 0)
+                   + (i < SIZEX - 1? Aplusi(i,j,k)*r(i+1,j,k) : 0)
+                   + (j > 0? Aplusj(i,j-1,k)*r(i,j-1,k) : 0)
+                   + (j < SIZEY - 1? Aplusj(i,j,k)*r(i,j+1,k) : 0)
+                   + (k > 0? Aplusk(i,j,k-1)*r(i,j,k-1) : 0)
+                   + (k < SIZEZ - 1? Aplusk(i,j,k)*r(i,j,k+1) : 0);
     });
     return z;
 }

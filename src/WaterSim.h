@@ -10,17 +10,17 @@
 #include "HandmadeMath.h"
 
 #include "Array3D.h"
-#include "Shader.h"
 #include "Utils.h"
+#include "WaterSimSettings.h"
 
 struct FirstPersonCamera;
 
 extern Eigen::Matrix<double, 64, 64> CUBIC_INTERP_MAT;
 
-class WaterSim {
-    static constexpr int SIZEX = 50;
-    static constexpr int SIZEY = 50;
-    static constexpr int SIZEZ = 50;
+struct WaterSim {
+    static constexpr int SIZEX = WaterSimSettings::SIZEX;
+    static constexpr int SIZEY = WaterSimSettings::SIZEY;
+    static constexpr int SIZEZ = WaterSimSettings::SIZEZ;
 
     template <typename T>
     using Grid3D = Array3D<T, SIZEX, SIZEY, SIZEZ>;
@@ -40,27 +40,7 @@ class WaterSim {
     double dx = 1.0;
     double dt = 0.016;
 
-    // Data related to rendering
-    enum class DrawMode {
-        POINT, LINE
-    };
-    DrawMode drawMode = DrawMode::POINT;
-    static constexpr float CELL_SIZE = 1.0f / SIZEY;
-    static constexpr float VEL_LINE_SCALE = 1.0f / SIZEY;
-    static constexpr size_t POINT_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ;
-    static constexpr size_t LINE_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ * 2;
-    GLuint lineVAO;
-    GLuint pointVAO;
-    GLuint lineVBO;
-    GLuint lineTypeVBO;
-    hmm_vec3 vertices[LINE_VERTEX_COUNT];
-    hmm_vec4 vertexColors[LINE_VERTEX_COUNT];
-    Shader shader;
-
-public:
     void setup();
-
-    void setupDraw(FirstPersonCamera* camera);
 
     Eigen::Vector3d clampPos(Eigen::Vector3d x);
 
@@ -68,11 +48,7 @@ public:
 
     void update();
 
-    void draw();
-
     void debugPrint();
-
-private:
 
     void applyAdvection();
 

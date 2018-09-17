@@ -144,9 +144,7 @@ void App::start() {
     camera.transform.pos = HMM_Vec3(0.0f, 0.0f, 0.0f);
 
     waterSim.setup();
-    waterSim.setupDraw(&camera);
-    waterSim.runFrame();
-    waterSim.debugPrint();
+    waterRenderer.setup(&waterSim, &camera);
 
     // Program loop
     Uint32 frameTime;
@@ -173,6 +171,7 @@ void App::start() {
                     case SDLK_m: {
                         settings.isMouseRelative = !settings.isMouseRelative;
                         SDL_SetRelativeMouseMode(settings.isMouseRelative? SDL_TRUE : SDL_FALSE);
+                        camera.mouseMovementEnabled = settings.isMouseRelative;
                         break;
                     }
                 }
@@ -188,6 +187,7 @@ void App::start() {
         InputManager::get()->update();
         camera.update(dt);
         waterSim.update();
+        waterRenderer.update();
 
         //
         // Render
@@ -201,7 +201,9 @@ void App::start() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        waterSim.draw();
+        waterRenderer.draw();
+
+        waterRenderer.drawUI();
 
         ImGui::Begin("Camera Info");
         ImGui::Text("pos: %f %f %f", camera.transform.pos.X, camera.transform.pos.Y, camera.transform.pos.Z);

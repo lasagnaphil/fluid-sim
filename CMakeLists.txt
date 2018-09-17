@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.11)
 set(PROJECT_NAME fluid_sim)
 project(${PROJECT_NAME})
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type -Wl,--stack,0x100000000")
 
 file(GLOB_RECURSE PROJECT_SOURCES src/*.cpp)
 file(GLOB_RECURSE PROJECT_HEADERS src/*.h)
@@ -13,6 +13,9 @@ file(GLOB_RECURSE PROJECT_SHADERS src/shaders/*.vert src/shaders/*.frag src/shad
 add_executable(${PROJECT_NAME} ${PROJECT_HEADERS} ${PROJECT_SOURCES} ${PROJECT_SHADERS})
 
 # SDL2
+if (MINGW)
+    set(SDL2_PATH "C:\\Libraries\\SDL2-2.0.8-MinGW\\x86_64-w64-mingw32")
+endif(MINGW)
 find_package(SDL2 REQUIRED)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIR})
 
