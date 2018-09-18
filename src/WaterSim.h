@@ -36,13 +36,13 @@ struct WaterSim {
     Array3D<CellType, SIZEX, SIZEY, SIZEZ> cell = {};
 
     Eigen::Vector3d gravity = {0, -9.8, 0};
-    double rho = 1.0;
-    double dx = 1.0;
+    double rho = 1000.0;
+    double dx = 0.01;
     double dt = 0.016;
 
     void setup();
 
-    Eigen::Vector3d clampPos(Eigen::Vector3d x);
+    Eigen::Vector3d clampPos(const Eigen::Vector3d& x);
 
     void runFrame();
 
