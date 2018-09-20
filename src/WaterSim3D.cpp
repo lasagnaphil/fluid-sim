@@ -1,13 +1,13 @@
 //
 // Created by lasagnaphil on 9/13/18.
 //
-#include "WaterSim.h"
+#include "WaterSim3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 #include "Eigen/SparseCore"
 #include "Eigen/IterativeLinearSolvers"
 
-void WaterSim::setup() {
+void WaterSim3D::setup() {
     iterate([&](size_t i, size_t j, size_t k) {
         /*
         if (i == 0 || i == 1 || i == SIZEX - 2 || i == SIZEX - 1 ||
@@ -28,7 +28,7 @@ void WaterSim::setup() {
     });
 }
 
-Eigen::Vector3d WaterSim::clampPos(const Eigen::Vector3d& x) {
+Eigen::Vector3d WaterSim3D::clampPos(const Eigen::Vector3d& x) {
     Eigen::Vector3d clamped;
     clamped(0) = clamp(x(0), 0.0, (double)SIZEX);
     clamped(1) = clamp(x(1), 0.0, (double)SIZEY);
@@ -36,13 +36,13 @@ Eigen::Vector3d WaterSim::clampPos(const Eigen::Vector3d& x) {
     return clamped;
 }
 
-void WaterSim::runFrame() {
+void WaterSim3D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
 }
 
-void WaterSim::update() {
+void WaterSim3D::update() {
     static int stage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
@@ -56,7 +56,7 @@ void WaterSim::update() {
     }
 }
 
-void WaterSim::debugPrint() {
+void WaterSim3D::debugPrint() {
     log_info("Printing water sim states: ");
     for (size_t i = 0; i < SIZEX; i++) {
         for (size_t j = 0; j < SIZEY; j++) {
@@ -68,7 +68,7 @@ void WaterSim::debugPrint() {
     }
 }
 
-void WaterSim::applyAdvection() {
+void WaterSim3D::applyAdvection() {
     using Eigen::Vector3d;
     iterateU([&](size_t i, size_t j, size_t k) {
         Vector3d u_pos = Vector3d((double)i - 0.5, j, k);
@@ -94,7 +94,7 @@ void WaterSim::applyAdvection() {
     });
 }
 
-void WaterSim::applyGravity() {
+void WaterSim3D::applyGravity() {
     iterateU([&](size_t i, size_t j, size_t k) {
         u(i,j,k) += dt * gravity(0);
     });
@@ -106,24 +106,23 @@ void WaterSim::applyGravity() {
     });
 }
 
-void WaterSim::applyProjection() {
+void WaterSim3D::applyProjection() {
     using Eigen::Vector3d;
     Eigen::SparseMatrix<double> A(SIZEX*SIZEY*SIZEZ, SIZEX*SIZEY*SIZEZ);
 
 #define A_DIAG(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_PLUSI(__i,__j,__k) A.insert((__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_PLUSJ(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_PLUSK(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + (__k+1), __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_MINUSI(__i,__j,__k) A.insert((__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_MINUSJ(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_MINUSK(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + (__k+1), __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
+#define A_PLUSI(__i,__j,__k, __v) \
+A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, (__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v; \
+A.insert((__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
 
-    /*
-    Grid3D<double> Adiag = {};
-    Grid3D<double> Aplusi = {};
-    Grid3D<double> Aplusj = {};
-    Grid3D<double> Aplusk =DIAG {};
-     */
+#define A_PLUSJ(__i,__j,__k, __v) \
+A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k) = __v; \
+A.insert(__i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
+
+#define A_PLUSK(__i,__j,__k, __v) \
+A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + (__k+1)) = __v;\
+A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k+1, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
+
     Grid3D<double> rhs = {};
 
     // calculate lhs (matrix A)
@@ -136,8 +135,7 @@ void WaterSim::applyProjection() {
             }
             if (cell(i+1,j,k) == CellType::FLUID) {
                 A_DIAG(i,j,k) += scaleA;
-                A_PLUSI(i,j,k) -scaleA;
-                A_MINUSI(i,j,k) = -scaleA;
+                A_PLUSI(i,j,k,-scaleA)
             }
             else if (cell(i+1,j,k) == CellType::EMPTY) {
                 A_DIAG(i,j,k) += scaleA;
@@ -147,8 +145,7 @@ void WaterSim::applyProjection() {
             }
             if (cell(i,j+1,k) == CellType::FLUID) {
                 A_DIAG(i,j,k) += scaleA;
-                A_PLUSI(i,j,k) = -scaleA;
-                A_MINUSI(i,j,k) = -scaleA;
+                A_PLUSI(i,j,k,-scaleA)
             }
             else if (cell(i+1,j,k) == CellType::EMPTY) {
                 A_DIAG(i,j,k) += scaleA;
@@ -158,8 +155,7 @@ void WaterSim::applyProjection() {
             }
             if (cell(i,j,k+1) == CellType::FLUID) {
                 A_DIAG(i,j,k) += scaleA;
-                A_PLUSK(i,j,k) = -scaleA;
-                A_MINUSK(i,j,k) = -scaleA;
+                A_PLUSK(i,j,k,-scaleA)
             }
             else if (cell(i,j,k+1) == CellType::EMPTY) {
                 A_DIAG(i,j,k) += scaleA;
@@ -287,10 +283,10 @@ void WaterSim::applyProjection() {
     }
 }
 
-WaterSim::Grid3D<double> WaterSim::applyA(const WaterSim::Grid3D<double> &r, const WaterSim::Grid3D<double> &Adiag,
-                                          const WaterSim::Grid3D<double> &Aplusi,
-                                          const WaterSim::Grid3D<double> &Aplusj,
-                                          const WaterSim::Grid3D<double> &Aplusk) {
+WaterSim3D::Grid3D<double> WaterSim3D::applyA(const WaterSim3D::Grid3D<double> &r, const WaterSim3D::Grid3D<double> &Adiag,
+                                          const WaterSim3D::Grid3D<double> &Aplusi,
+                                          const WaterSim3D::Grid3D<double> &Aplusj,
+                                          const WaterSim3D::Grid3D<double> &Aplusk) {
     Grid3D<double> z;
     iterate([&](size_t i, size_t j, size_t k) {
         z(i,j,k) = Adiag(i,j,k)*r(i,j,k)
@@ -304,10 +300,10 @@ WaterSim::Grid3D<double> WaterSim::applyA(const WaterSim::Grid3D<double> &r, con
     return z;
 }
 
-WaterSim::Grid3D<double>
-WaterSim::applyPreconditioner(const WaterSim::Grid3D<double> &r, const WaterSim::Grid3D<double> &precon,
-                              const WaterSim::Grid3D<double> &Aplusi, const WaterSim::Grid3D<double> &Aplusj,
-                              const WaterSim::Grid3D<double> &Aplusk) {
+WaterSim3D::Grid3D<double>
+WaterSim3D::applyPreconditioner(const WaterSim3D::Grid3D<double> &r, const WaterSim3D::Grid3D<double> &precon,
+                              const WaterSim3D::Grid3D<double> &Aplusi, const WaterSim3D::Grid3D<double> &Aplusj,
+                              const WaterSim3D::Grid3D<double> &Aplusk) {
     Grid3D<double> q = {};
     iterate([&](size_t i, size_t j, size_t k) {
         if (cell(i,j,k) == CellType::FLUID) {
@@ -337,14 +333,14 @@ WaterSim::applyPreconditioner(const WaterSim::Grid3D<double> &r, const WaterSim:
 #undef A_MINUSJ
 #undef A_MINUSK
 
-Eigen::Vector3d WaterSim::vel(size_t i, size_t j, size_t k) {
+Eigen::Vector3d WaterSim3D::vel(size_t i, size_t j, size_t k) {
     return 0.5 * Eigen::Vector3d(
             u(i+1,j,k) + u(i,j,k),
             v(i,j+1,k) + v(i,j,k),
             w(i,j,k+1) + w(i,j,k));
 }
 
-Eigen::Vector3d WaterSim::velU(size_t i, size_t j, size_t k) {
+Eigen::Vector3d WaterSim3D::velU(size_t i, size_t j, size_t k) {
     if (i > 0 && i < SIZEX)
         return Eigen::Vector3d(
                 u(i,j,k),
@@ -365,7 +361,7 @@ Eigen::Vector3d WaterSim::velU(size_t i, size_t j, size_t k) {
         );
 }
 
-Eigen::Vector3d WaterSim::velV(size_t i, size_t j, size_t k) {
+Eigen::Vector3d WaterSim3D::velV(size_t i, size_t j, size_t k) {
     if (j > 0 && j < SIZEY)
         return Eigen::Vector3d(
                 0.25 * (u(i,j-1,k) + u(i,j,k) + u(i+1,j-1,k) + u(i+1,j,k)),
@@ -386,7 +382,7 @@ Eigen::Vector3d WaterSim::velV(size_t i, size_t j, size_t k) {
         );
 }
 
-Eigen::Vector3d WaterSim::velW(size_t i, size_t j, size_t k) {
+Eigen::Vector3d WaterSim3D::velW(size_t i, size_t j, size_t k) {
     if (k > 0 && k < SIZEZ)
         return Eigen::Vector3d(
                 0.25 * (u(i,j,k-1) + u(i+1,j,k-1) + u(i,j,k) + u(i+1,j,k)),

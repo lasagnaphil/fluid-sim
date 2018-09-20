@@ -12,12 +12,12 @@
 #include "WaterSimSettings.h"
 
 struct FirstPersonCamera;
-struct WaterSim;
+struct WaterSim3D;
 
 class WaterRenderer {
-    static constexpr int SIZEX = WaterSimSettings::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::SIZEY;
-    static constexpr int SIZEZ = WaterSimSettings::SIZEZ;
+    static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
+    static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
+    static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
 
     enum class DrawMode {
         POINT, LINE
@@ -35,10 +35,10 @@ class WaterRenderer {
     hmm_vec4 vertexColors[LINE_VERTEX_COUNT];
     Shader shader;
 
-    WaterSim* sim;
+    WaterSim3D* sim;
 
 public:
-    void setup(WaterSim* sim, FirstPersonCamera* camera);
+    void setup(WaterSim3D* sim, FirstPersonCamera* camera);
     void update();
     void draw();
     void drawUI();

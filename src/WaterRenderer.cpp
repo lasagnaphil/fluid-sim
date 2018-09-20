@@ -6,9 +6,9 @@
 #include "WaterRenderer.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
-#include "WaterSim.h"
+#include "WaterSim3D.h"
 
-void WaterRenderer::setup(WaterSim* sim, FirstPersonCamera* camera) {
+void WaterRenderer::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     this->sim = sim;
 
     const auto EMPTY_COLOR = HMM_Vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -16,16 +16,16 @@ void WaterRenderer::setup(WaterSim* sim, FirstPersonCamera* camera) {
     const auto SOLID_COLOR = HMM_Vec4(0.1f, 0.1f, 0.1f, 1.0f);
 
     sim->iterate([&](size_t i, size_t j, size_t k) {
-        WaterSim::CellType cellType = sim->cell(i, j, k);
-        if (cellType == WaterSim::CellType::EMPTY) {
+        WaterSim3D::CellType cellType = sim->cell(i, j, k);
+        if (cellType == WaterSim3D::CellType::EMPTY) {
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = EMPTY_COLOR;
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = EMPTY_COLOR;
         }
-        else if (cellType == WaterSim::CellType::FLUID) {
+        else if (cellType == WaterSim3D::CellType::FLUID) {
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = FLUID_COLOR;
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = FLUID_COLOR;
         }
-        else if (cellType == WaterSim::CellType::SOLID) {
+        else if (cellType == WaterSim3D::CellType::SOLID) {
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = SOLID_COLOR;
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1] = SOLID_COLOR;
         }

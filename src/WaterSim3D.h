@@ -13,14 +13,12 @@
 #include "Utils.h"
 #include "WaterSimSettings.h"
 
-struct FirstPersonCamera;
-
 extern Eigen::Matrix<double, 64, 64> CUBIC_INTERP_MAT;
 
-struct WaterSim {
-    static constexpr int SIZEX = WaterSimSettings::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::SIZEY;
-    static constexpr int SIZEZ = WaterSimSettings::SIZEZ;
+struct WaterSim3D {
+    static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
+    static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
+    static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
 
     template <typename T>
     using Grid3D = Array3D<T, SIZEX, SIZEY, SIZEZ>;
@@ -38,11 +36,9 @@ struct WaterSim {
     Eigen::Vector3d gravity = {0, -9.8, 0};
     double rho = 1000.0;
     double dx = 0.01;
-    double dt = 0.016;
+    double dt = 1.0 / 60.0;
 
     void setup();
-
-    Eigen::Vector3d clampPos(const Eigen::Vector3d& x);
 
     void runFrame();
 
@@ -55,6 +51,8 @@ struct WaterSim {
     void applyGravity();
 
     void applyProjection();
+
+    Eigen::Vector3d clampPos(const Eigen::Vector3d& x);
 
     Grid3D<double> applyA(const Grid3D<double>& r,
                           const Grid3D<double>& Adiag, const Grid3D<double>& Aplusi, const Grid3D<double>& Aplusj, const Grid3D<double>& Aplusk);

@@ -8,7 +8,7 @@
 #include <math/Vector2.h>
 #include <SDL.h>
 #include "FirstPersonCamera.h"
-#include "WaterSim.h"
+#include "WaterSim3D.h"
 #include "WaterRenderer.h"
 
 struct AppSettings {
@@ -30,7 +30,7 @@ struct App {
     AppSettings settings;
 
     FirstPersonCamera camera;
-    WaterSim waterSim;
+    WaterSim3D waterSim;
     WaterRenderer waterRenderer;
 };
 
