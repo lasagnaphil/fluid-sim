@@ -5,10 +5,6 @@
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
-#define EIGEN_USE_MKL_ALL
-#include "Eigen/SparseCore"
-#include "Eigen/IterativeLinearSolvers"
-
 void WaterSim2D::setup() {
     mac.iterate([&](size_t i, size_t j) {
         if (i == 0 || i == SIZEX - 1 ||
@@ -65,6 +61,8 @@ void WaterSim2D::applyGravity() {
 }
 
 void WaterSim2D::applyProjection() {
+    // TODO
+    /*
     Eigen::SparseMatrix<double> A(SIZEX*SIZEY, SIZEX*SIZEY);
     Eigen::Matrix<double, SIZEX*SIZEY, 1> rhs = {};
 
@@ -127,4 +125,5 @@ A.insert((__j+1)*SIZEX + __i,__j*SIZEX + __i) = __v;
     cg.compute(A);
     Eigen::Matrix<double, SIZEX*SIZEY, 1> sol = cg.solve(rhs);
     memcpy(p.data, sol.data(), sizeof(double)*SIZEX*SIZEY);
+     */
 }

@@ -4,20 +4,10 @@
 #include "WaterSim3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
-
-#define EIGEN_USE_MKL_ALL
-#include "Eigen/SparseCore"
-#include "Eigen/IterativeLinearSolvers"
-
 #include "Defer.h"
 
 void WaterSim3D::setup() {
     mac.iterate([&](size_t i, size_t j, size_t k) {
-        /*
-        if (i == 0 || i == 1 || i == SIZEX - 2 || i == SIZEX - 1 ||
-            j == 0 || j == 1 || j == SIZEY - 2 || j == SIZEY - 1 ||
-            k == 0 || k == 1 || k == SIZEZ - 2 || k == SIZEZ - 1) {
-            */
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1 ||
             k == 0 || k == SIZEZ - 1) {
@@ -98,23 +88,17 @@ void WaterSim3D::applyAdvection() {
 
 void WaterSim3D::applyGravity() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
-        mac.u(i,j,k) += dt * gravity(0);
+        mac.u(i,j,k) += dt * gravity.x;
     });
     mac.iterateV([&](size_t i, size_t j, size_t k) {
-        mac.v(i,j,k) += dt * gravity(1);
+        mac.v(i,j,k) += dt * gravity.y;
     });
     mac.iterateW([&](size_t i, size_t j, size_t k) {
-        mac.w(i,j,k) += dt * gravity(2);
+        mac.w(i,j,k) += dt * gravity.z;
     });
 }
 
 void WaterSim3D::applyProjection() {
-    /*
-    using Triplet = Eigen::Triplet<double>;
-    auto triplets = Vec<Triplet>::create(5*SIZEX*SIZEY*SIZEZ);
-    defer {triplets.free();};
-     */
-
     auto gridStack = Vec<Grid3D<double>>::create(10);
 
     auto& Adiag = gridStack.newItem();
@@ -160,31 +144,7 @@ void WaterSim3D::applyProjection() {
                 Adiag(i,j,k) += scaleA;
             }
         }
-        /*
-        if (A_diag != 0) {
-            triplets.push(Triplet(idx, idx, A_diag));
-        }
-        if (A_plusi != 0) {
-            triplets.push(Triplet(idx, idx + 1, A_plusi));
-            triplets.push(Triplet(idx + 1, idx, A_plusi));
-        }
-        if (A_plusj != 0) {
-            triplets.push(Triplet(idx, idx + SIZEX, A_plusj));
-            triplets.push(Triplet(idx + SIZEX, idx, A_plusj));
-        }
-        if (A_plusk != 0) {
-            triplets.push(Triplet(idx, idx + SIZEY*SIZEX, A_plusk));
-            triplets.push(Triplet(idx + SIZEY*SIZEX, idx, A_plusk));
-        }
-         */
     });
-
-    /*
-    Eigen::SparseMatrix<double> A(SIZEX*SIZEY*SIZEZ, SIZEX*SIZEY*SIZEZ);
-    A.setFromTriplets(triplets.data, triplets.data + triplets.size);
-
-    Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1> rhs = {};
-     */
 
     auto& rhs = gridStack.newItem();
 
@@ -219,13 +179,6 @@ void WaterSim3D::applyProjection() {
 
         });
     }
-
-    /*
-    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> cg;
-    cg.compute(A);
-    Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1> result = cg.solve(rhs);
-    memcpy(p.data, result.data(), sizeof(double)*SIZEX*SIZEY*SIZEZ);
-    */
 
 #define SQUARE(x) (x)*(x)
     // find preconditioner

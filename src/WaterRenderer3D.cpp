@@ -105,6 +105,7 @@ void WaterRenderer3D::draw() {
 }
 
 void WaterRenderer3D::drawUI() {
+    if (ENABLE_DEBUG_UI) {
     static size_t curr_k = 0;
 
     ImGui::Begin("Simulation Data");
@@ -142,5 +143,6 @@ void WaterRenderer3D::drawUI() {
         ImGui::Separator();
     }
     ImGui::End();
+    }
 }
 

@@ -18,6 +18,7 @@ class WaterRenderer3D {
     static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
     static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
+    static constexpr int ENABLE_DEBUG_UI = WaterSimSettings::Dim3D::ENABLE_DEBUG_UI;
 
     enum class DrawMode {
         POINT, LINE

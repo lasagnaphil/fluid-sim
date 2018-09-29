@@ -9,7 +9,6 @@
 #include <math/Utils.h>
 #include "WaterSimSettings.h"
 #include "math/Vector2.h"
-#include "Utils.h"
 
 template <typename T, size_t NX, size_t NY>
 struct Array2D {
@@ -125,8 +124,8 @@ struct WaterSim2D {
 
     Vector2d clampPos(Vector2d pos) {
         Vector2d clamped = {};
-        clamped.x = clamp(pos.x, 0.0, (double)SIZEX);
-        clamped.y = clamp(pos.y, 0.0, (double)SIZEY);
+        clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX);
+        clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY);
         return clamped;
     }
 };
