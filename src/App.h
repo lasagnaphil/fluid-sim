@@ -9,7 +9,7 @@
 #include <SDL.h>
 #include "FirstPersonCamera.h"
 #include "WaterSim3D.h"
-#include "WaterRenderer.h"
+#include "WaterRenderer3D.h"
 
 struct AppSettings {
     Vector2i screenSize = {800, 600};
@@ -31,7 +31,7 @@ struct App {
 
     FirstPersonCamera camera;
     WaterSim3D waterSim;
-    WaterRenderer waterRenderer;
+    WaterRenderer3D waterRenderer;
 };
 
 #endif //FLUID_SIM_APP_H

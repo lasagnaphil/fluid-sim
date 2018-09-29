@@ -10,8 +10,6 @@
 #define SQUARE(x) (x)*(x)
 #define CUBE(x) (x)*(x)*(x)
 
-double powi(double d, int i);
-
 Eigen::Vector4d catmullRom(double a);
 
 template <typename T>

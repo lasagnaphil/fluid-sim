@@ -19,6 +19,12 @@ endif(MINGW)
 find_package(SDL2 REQUIRED)
 target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIR})
 
+# MKL
+if (MINGW)
+    include_directories("C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/include")
+    link_directories("C:/Program Files (x86)/IntelSWTools/compilers_and_libraries_2019/windows/mkl/lib/intel64")
+endif(MINGW)
+
 # GLAD
 set(GLAD_DIR deps/glad)
 add_library(glad ${GLAD_DIR}/src/glad.c)

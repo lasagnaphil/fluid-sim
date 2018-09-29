@@ -5,6 +5,7 @@
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
+#define EIGEN_USE_MKL_ALL
 #include "Eigen/SparseCore"
 #include "Eigen/IterativeLinearSolvers"
 

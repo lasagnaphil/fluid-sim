@@ -4,11 +4,13 @@
 #include "WaterSim3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
+
+#define EIGEN_USE_MKL_ALL
 #include "Eigen/SparseCore"
 #include "Eigen/IterativeLinearSolvers"
 
 void WaterSim3D::setup() {
-    iterate([&](size_t i, size_t j, size_t k) {
+    mac.iterate([&](size_t i, size_t j, size_t k) {
         /*
         if (i == 0 || i == 1 || i == SIZEX - 2 || i == SIZEX - 1 ||
             j == 0 || j == 1 || j == SIZEY - 2 || j == SIZEY - 1 ||
@@ -28,11 +30,11 @@ void WaterSim3D::setup() {
     });
 }
 
-Eigen::Vector3d WaterSim3D::clampPos(const Eigen::Vector3d& x) {
-    Eigen::Vector3d clamped;
-    clamped(0) = clamp(x(0), 0.0, (double)SIZEX);
-    clamped(1) = clamp(x(1), 0.0, (double)SIZEY);
-    clamped(2) = clamp(x(2), 0.0, (double)SIZEZ);
+Vector3d WaterSim3D::clampPos(const Vector3d& x) {
+    Vector3d clamped;
+    clamped.x = utils::clamp<double>(x.x, 0.0, SIZEX);
+    clamped.y = utils::clamp<double>(x.y, 0.0, SIZEY);
+    clamped.z = utils::clamp<double>(x.z, 0.0, SIZEZ);
     return clamped;
 }
 
@@ -61,142 +63,149 @@ void WaterSim3D::debugPrint() {
     for (size_t i = 0; i < SIZEX; i++) {
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t k = 0; k < SIZEZ; k++) {
-                Eigen::Vector3d vec = vel(i,j,k);
-                printf("(%10f, %10f, %10f)\n", vec(0), vec(1), vec(2));
+                Vector3d vec = mac.vel(i,j,k);
+                printf("(%10f, %10f, %10f)\n", vec.x, vec.y, vec.z);
             }
         }
     }
 }
 
 void WaterSim3D::applyAdvection() {
-    using Eigen::Vector3d;
-    iterateU([&](size_t i, size_t j, size_t k) {
-        Vector3d u_pos = Vector3d((double)i - 0.5, j, k);
-        Vector3d x_mid = u_pos - 0.5 * dt * velU(i, j, k);
+    mac.iterateU([&](size_t i, size_t j, size_t k) {
+        Vector3d u_pos = Vector3d::create(i, (double)j + 0.5, (double)k + 0.5);
+        Vector3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = u_pos - dt * velInterp(x_mid_cl);
-        double vInterp = velInterpU(x_p);
-        u(i,j,k) = vInterp;
+        Vector3d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
+        mac.u(i,j,k) = mac.velInterpU(x_p);
     });
-    iterateV([&](size_t i, size_t j, size_t k) {
-        Vector3d v_pos = Vector3d(i, (double)j - 0.5, k);
-        Vector3d x_mid = v_pos - 0.5 * dt * velV(i, j, k);
+    mac.iterateV([&](size_t i, size_t j, size_t k) {
+        Vector3d v_pos = Vector3d::create((double)i + 0.5, j, (double)k + 0.5);
+        Vector3d x_mid = v_pos - 0.5 * dt * mac.velV(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = v_pos - dt * velInterp(x_mid_cl);
-        v(i,j,k) = velInterpV(x_p);
+        Vector3d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
+        mac.v(i,j,k) = mac.velInterpV(x_p);
     });
-    iterateW([&](size_t i, size_t j, size_t k) {
-        Vector3d w_pos = Vector3d(i, j, (double)k - 0.5);
-        Vector3d x_mid = w_pos - 0.5 * dt * velW(i, j, k);
+    mac.iterateW([&](size_t i, size_t j, size_t k) {
+        Vector3d w_pos = Vector3d::create((double)i + 0.5, (double)j + 0.5, k);
+        Vector3d x_mid = w_pos - 0.5 * dt * mac.velW(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = w_pos - dt * velInterp(x_mid_cl);
-        w(i,j,k) = velInterpW(x_p);
+        Vector3d x_p = w_pos - dt * mac.velInterp(x_mid_cl);
+        mac.w(i,j,k) = mac.velInterpW(x_p);
     });
 }
 
 void WaterSim3D::applyGravity() {
-    iterateU([&](size_t i, size_t j, size_t k) {
-        u(i,j,k) += dt * gravity(0);
+    mac.iterateU([&](size_t i, size_t j, size_t k) {
+        mac.u(i,j,k) += dt * gravity(0);
     });
-    iterateV([&](size_t i, size_t j, size_t k) {
-        v(i,j,k) += dt * gravity(1);
+    mac.iterateV([&](size_t i, size_t j, size_t k) {
+        mac.v(i,j,k) += dt * gravity(1);
     });
-    iterateW([&](size_t i, size_t j, size_t k) {
-        w(i,j,k) += dt * gravity(2);
+    mac.iterateW([&](size_t i, size_t j, size_t k) {
+        mac.w(i,j,k) += dt * gravity(2);
     });
 }
 
 void WaterSim3D::applyProjection() {
-    using Eigen::Vector3d;
-    Eigen::SparseMatrix<double> A(SIZEX*SIZEY*SIZEZ, SIZEX*SIZEY*SIZEZ);
-
-#define A_DIAG(__i,__j,__k) A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
-#define A_PLUSI(__i,__j,__k, __v) \
-A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, (__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v; \
-A.insert((__i+1)*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
-
-#define A_PLUSJ(__i,__j,__k, __v) \
-A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k) = __v; \
-A.insert(__i*SIZEY*SIZEZ + (__j+1)*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
-
-#define A_PLUSK(__i,__j,__k, __v) \
-A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k, __i*SIZEY*SIZEZ + __j*SIZEZ + (__k+1)) = __v;\
-A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k+1, __i*SIZEY*SIZEZ + __j*SIZEZ + __k) = __v;
-
-    Grid3D<double> rhs = {};
+    using Triplet = Eigen::Triplet<double>;
+    auto triplets = Vec<Triplet>::create(5*SIZEX*SIZEY*SIZEZ);
 
     // calculate lhs (matrix A)
-    double scaleA = dt / (rho * dx * dx);
-    iterate([&](size_t i, size_t j, size_t k) {
+    double scaleA = dt / (rho * mac.dx * mac.dx);
+    mac.iterate([&](size_t i, size_t j, size_t k) {
         // note: if index is out of bounds, regard the cell as EMPTY
+        size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
+        double A_diag = 0, A_plusi = 0, A_plusj = 0, A_plusk = 0;
         if (cell(i,j,k) == CellType::FLUID) {
             if (cell(i-1,j,k) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
+                A_diag += scaleA;
             }
             if (cell(i+1,j,k) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
-                A_PLUSI(i,j,k,-scaleA)
+                A_diag += scaleA;
+                A_plusi = -scaleA;
             }
             else if (cell(i+1,j,k) == CellType::EMPTY) {
-                A_DIAG(i,j,k) += scaleA;
+                A_diag += scaleA;
             }
             if (cell(i,j-1,k) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
+                A_diag += scaleA;
             }
             if (cell(i,j+1,k) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
-                A_PLUSI(i,j,k,-scaleA)
+                A_diag += scaleA;
+                A_plusj = -scaleA;
             }
-            else if (cell(i+1,j,k) == CellType::EMPTY) {
-                A_DIAG(i,j,k) += scaleA;
+            else if (cell(i,j+1,k) == CellType::EMPTY) {
+                A_diag += scaleA;
             }
             if (cell(i,j,k-1) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
+                A_diag += scaleA;
             }
             if (cell(i,j,k+1) == CellType::FLUID) {
-                A_DIAG(i,j,k) += scaleA;
-                A_PLUSK(i,j,k,-scaleA)
+                A_diag += scaleA;
+                A_plusk = -scaleA;
             }
             else if (cell(i,j,k+1) == CellType::EMPTY) {
-                A_DIAG(i,j,k) += scaleA;
+                A_diag += scaleA;
             }
+        }
+        if (A_diag != 0) {
+            triplets.push(Triplet(idx, idx, A_diag));
+        }
+        if (A_plusi != 0) {
+            triplets.push(Triplet(idx, idx + 1, A_plusi));
+            triplets.push(Triplet(idx + 1, idx, A_plusi));
+        }
+        if (A_plusj != 0) {
+            triplets.push(Triplet(idx, idx + SIZEX, A_plusj));
+            triplets.push(Triplet(idx + SIZEX, idx, A_plusj));
+        }
+        if (A_plusk != 0) {
+            triplets.push(Triplet(idx, idx + SIZEY*SIZEX, A_plusk));
+            triplets.push(Triplet(idx + SIZEY*SIZEX, idx, A_plusk));
         }
     });
 
+    Eigen::SparseMatrix<double> A(SIZEX*SIZEY*SIZEZ, SIZEX*SIZEY*SIZEZ);
+    A.setFromTriplets(triplets.data, triplets.data + triplets.size);
+    triplets.free();
+
+    Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1> rhs = {};
     // calculate rhs
     {
-        double scale = 1 / dx;
-        iterate([&](size_t i, size_t j, size_t k) {
+        double scale = 1 / mac.dx;
+        mac.iterate([&](size_t i, size_t j, size_t k) {
+            size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
             if (cell(i,j,k) == CellType::FLUID) {
-                rhs(i, j, k) =
-                        -(u(i+1,j,k) - u(i,j,k) + v(i,j+1,k) - v(i,j,k) + w(i,j,k+1) - w(i,j,k)) / dx;
+                rhs(idx) = -mac.velDiv(i,j,k);
                 // modify rhs to account for solid velocities
                 // TODO: use usolid, vsolid, wsolid instead of 0
                 if (cell(i-1,j,k) == CellType::SOLID) {
-                    rhs(i,j,k) -= scale * (u(i,j,k) - 0);
+                    rhs(idx) -= scale * (mac.u(i,j,k) - 0);
                 }
                 if (cell(i+1,j,k) == CellType::SOLID) {
-                    rhs(i,j,k) += scale * (u(i+1,j,k) - 0);
+                    rhs(idx) += scale * (mac.u(i+1,j,k) - 0);
                 }
                 if (cell(i,j-1,k) == CellType::SOLID) {
-                    rhs(i,j,k) -= scale * (v(i,j,k) - 0);
+                    rhs(idx) -= scale * (mac.v(i,j,k) - 0);
                 }
                 if (cell(i,j+1,k) == CellType::SOLID) {
-                    rhs(i,j,k) += scale * (v(i,j+1,k) - 0);
+                    rhs(idx) += scale * (mac.v(i,j+1,k) - 0);
                 }
                 if (cell(i,j,k-1) == CellType::SOLID) {
-                    rhs(i,j,k) -= scale * (w(i,j,k) - 0);
+                    rhs(idx) -= scale * (mac.w(i,j,k) - 0);
                 }
                 if (cell(i,j,k+1) == CellType::SOLID) {
-                    rhs(i,j,k) += scale * (w(i,j,k+1) - 0);
+                    rhs(idx) += scale * (mac.w(i,j,k+1) - 0);
                 }
             }
 
         });
     }
+
     Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> cg;
     cg.compute(A);
-    p.data = cg.solve(rhs.data);
+    Eigen::Map<Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1>> result((double*)p.data);
+    result = cg.solve(rhs);
 
     /*
     // find preconditioner
@@ -247,37 +256,37 @@ A.insert(__i*SIZEY*SIZEZ + __j*SIZEZ + __k+1, __i*SIZEY*SIZEZ + __j*SIZEZ + __k)
 
     // update velocity using the solved pressure
     {
-        double scale = dt / (rho * dx);
-        iterate([&](size_t i, size_t j, size_t k) {
+        double scale = dt / (rho * mac.dx);
+        mac.iterate([&](size_t i, size_t j, size_t k) {
             if (i > 0 && (cell(i-1,j,k) == CellType::FLUID || cell(i,j,k) == CellType::FLUID)) {
                 if (cell(i-1,j,k) == CellType::SOLID || cell(i,j,k) == CellType::SOLID)
-                    u(i,j,k) = 0; // usolid(i,j,k);
+                    mac.u(i,j,k) = 0; // usolid(i,j,k);
                 else
-                    u(i,j,k) -= scale * (p(i,j,k) - p(i-1,j,k));
+                    mac.u(i,j,k) -= scale * (p(i,j,k) - p(i-1,j,k));
             }
             else {
                 // mark as unknown?
-                u(i,j,k) = 0;
+                mac.u(i,j,k) = 0;
             }
             if (j > 0 && (cell(i,j-1,k) == CellType::FLUID || cell(i,j,k) == CellType::FLUID)) {
                 if (cell(i,j-1,k) == CellType::SOLID || cell(i,j,k) == CellType::SOLID)
-                    v(i,j,k) = 0;
+                    mac.v(i,j,k) = 0;
                 else
-                    v(i,j,k) -= scale * (p(i,j,k) - p(i,j-1,k));
+                    mac.v(i,j,k) -= scale * (p(i,j,k) - p(i,j-1,k));
             }
             else {
                 // mark as unknown?
-                v(i,j,k) = 0;
+                mac.v(i,j,k) = 0;
             }
             if (k > 0 && (cell(i,j,k-1) == CellType::FLUID || cell(i,j,k) == CellType::FLUID)) {
                 if (cell(i,j,k-1) == CellType::SOLID || cell(i,j,k) == CellType::SOLID)
-                    w(i,j,k) = 0;
+                    mac.w(i,j,k) = 0;
                 else
-                    w(i,j,k) -= scale * (p(i,j,k) - p(i,j,k-1));
+                    mac.w(i,j,k) -= scale * (p(i,j,k) - p(i,j,k-1));
             }
             else {
                 // mark as unknown?
-                w(i,j,k) = 0;
+                mac.w(i,j,k) = 0;
             }
         });
     }
@@ -288,7 +297,7 @@ WaterSim3D::Grid3D<double> WaterSim3D::applyA(const WaterSim3D::Grid3D<double> &
                                           const WaterSim3D::Grid3D<double> &Aplusj,
                                           const WaterSim3D::Grid3D<double> &Aplusk) {
     Grid3D<double> z;
-    iterate([&](size_t i, size_t j, size_t k) {
+    mac.iterate([&](size_t i, size_t j, size_t k) {
         z(i,j,k) = Adiag(i,j,k)*r(i,j,k)
                    + (i > 0? Aplusi(i-1,j,k)*r(i-1,j,k) : 0)
                    + (i < SIZEX - 1? Aplusi(i,j,k)*r(i+1,j,k) : 0)
@@ -305,7 +314,7 @@ WaterSim3D::applyPreconditioner(const WaterSim3D::Grid3D<double> &r, const Water
                               const WaterSim3D::Grid3D<double> &Aplusi, const WaterSim3D::Grid3D<double> &Aplusj,
                               const WaterSim3D::Grid3D<double> &Aplusk) {
     Grid3D<double> q = {};
-    iterate([&](size_t i, size_t j, size_t k) {
+    mac.iterate([&](size_t i, size_t j, size_t k) {
         if (cell(i,j,k) == CellType::FLUID) {
             double t = r(i,j,k) - (i > 0? Aplusi(i-1,j,k) * precon(i-1,j,k) * q(i-1,j,k) : 0)
                        - (j > 0? Aplusj(i,j-1,k) * precon(i,j-1,k) * q(i,j-1,k) : 0)
@@ -314,7 +323,7 @@ WaterSim3D::applyPreconditioner(const WaterSim3D::Grid3D<double> &r, const Water
         }
     });
     Grid3D<double> z = {};
-    iterateBackwards([&](size_t i, size_t j, size_t k) {
+    mac.iterateBackwards([&](size_t i, size_t j, size_t k) {
         if (cell(i,j,k) == CellType::FLUID) {
             double t = q(i,j,k) - (i < SIZEX - 1? Aplusi(i,j,k) * precon(i,j,k) * z(i+1,j,k) : 0)
                        - (j < SIZEY - 1? Aplusi(i,j,k) * precon(i,j,k) * z(i,j+1,k) : 0)
@@ -323,83 +332,5 @@ WaterSim3D::applyPreconditioner(const WaterSim3D::Grid3D<double> &r, const Water
         }
     });
     return z;
-}
-
-#undef A_DIAG
-#undef A_PLUSI
-#undef A_PLUSJ
-#undef A_PLUSK
-#undef A_MINUSI
-#undef A_MINUSJ
-#undef A_MINUSK
-
-Eigen::Vector3d WaterSim3D::vel(size_t i, size_t j, size_t k) {
-    return 0.5 * Eigen::Vector3d(
-            u(i+1,j,k) + u(i,j,k),
-            v(i,j+1,k) + v(i,j,k),
-            w(i,j,k+1) + w(i,j,k));
-}
-
-Eigen::Vector3d WaterSim3D::velU(size_t i, size_t j, size_t k) {
-    if (i > 0 && i < SIZEX)
-        return Eigen::Vector3d(
-                u(i,j,k),
-                0.25 * (v(i-1,j,k) + v(i-1,j+1,k) + v(i,j,k) + v(i,j+1,k)),
-                0.25 * (w(i-1,j,k) + w(i-1,j,k+1) + w(i,j,k) + w(i,j,k+1))
-        );
-    else if (i == 0)
-        return Eigen::Vector3d(
-                u(i,j,k),
-                0.5 * (v(i,j,k) + v(i,j+1,k)),
-                0.5 * (w(i,j,k) + w(i,j,k+1))
-        );
-    else
-        return Eigen::Vector3d(
-                u(i,j,k),
-                0.5 * (v(i-1,j,k) + v(i-1,j+1,k)),
-                0.5 * (w(i-1,j,k) + w(i-1,j,k+1))
-        );
-}
-
-Eigen::Vector3d WaterSim3D::velV(size_t i, size_t j, size_t k) {
-    if (j > 0 && j < SIZEY)
-        return Eigen::Vector3d(
-                0.25 * (u(i,j-1,k) + u(i,j,k) + u(i+1,j-1,k) + u(i+1,j,k)),
-                v(i,j,k),
-                0.25 * (w(i,j-1,k) + w(i,j-1,k+1) + w(i,j,k) + w(i,j,k+1))
-        );
-    else if (j == 0)
-        return Eigen::Vector3d(
-                0.5 * (u(i,j,k) + u(i+1,j,k)),
-                v(i,j,k),
-                0.5 * (w(i,j,k) + w(i,j,k+1))
-        );
-    else
-        return Eigen::Vector3d(
-                0.5 * (u(i,j-1,k) + u(i+1,j-1,k)),
-                v(i,j,k),
-                0.5 * (w(i,j-1,k) + w(i,j-1,k+1))
-        );
-}
-
-Eigen::Vector3d WaterSim3D::velW(size_t i, size_t j, size_t k) {
-    if (k > 0 && k < SIZEZ)
-        return Eigen::Vector3d(
-                0.25 * (u(i,j,k-1) + u(i+1,j,k-1) + u(i,j,k) + u(i+1,j,k)),
-                0.25 * (v(i,j,k-1) + v(i,j+1,k-1) + v(i,j,k) + v(i,j+1,k)),
-                w(i,j,k)
-        );
-    else if (k == 0)
-        return Eigen::Vector3d(
-                0.5 * (u(i,j,k) + u(i+1,j,k)),
-                0.5 * (v(i,j,k) + v(i,j+1,k)),
-                w(i,j,k)
-        );
-    else
-        return Eigen::Vector3d(
-                0.5 * (u(i,j,k-1) + u(i+1,j,k-1)),
-                0.5 * (v(i,j,k-1) + v(i,j+1,k-1)),
-                w(i,j,k)
-        );
 }
 

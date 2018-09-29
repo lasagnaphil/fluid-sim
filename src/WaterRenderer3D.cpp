@@ -3,19 +3,19 @@
 //
 
 #include <imgui.h>
-#include "WaterRenderer.h"
+#include "WaterRenderer3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 #include "WaterSim3D.h"
 
-void WaterRenderer::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
+void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     this->sim = sim;
 
     const auto EMPTY_COLOR = HMM_Vec4(0.0f, 0.0f, 0.0f, 1.0f);
     const auto FLUID_COLOR = HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f);
     const auto SOLID_COLOR = HMM_Vec4(0.1f, 0.1f, 0.1f, 1.0f);
 
-    sim->iterate([&](size_t i, size_t j, size_t k) {
+    sim->mac.iterate([&](size_t i, size_t j, size_t k) {
         WaterSim3D::CellType cellType = sim->cell(i, j, k);
         if (cellType == WaterSim3D::CellType::EMPTY) {
             vertexColors[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)] = EMPTY_COLOR;
@@ -66,7 +66,7 @@ void WaterRenderer::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     camera->addShader(&shader);
 }
 
-void WaterRenderer::update() {
+void WaterRenderer3D::update() {
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_1)) {
         drawMode = DrawMode::POINT;
@@ -75,9 +75,9 @@ void WaterRenderer::update() {
         drawMode = DrawMode::LINE;
     }
 
-    sim->iterate([&](size_t i, size_t j, size_t k) {
-        Eigen::Vector3d dir_d = sim->vel(i, j, k);
-        hmm_vec3 dir = HMM_Vec3((float)dir_d(0), (float)dir_d(1), (float)dir_d(2));
+    sim->mac.iterate([&](size_t i, size_t j, size_t k) {
+        Vector3d dir_d = sim->mac.vel(i, j, k);
+        hmm_vec3 dir = HMM_Vec3((float)dir_d.x, (float)dir_d.x, (float)dir_d.x);
         vertices[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k)]
                 = CELL_SIZE * HMM_Vec3(i, j, k);
         vertices[2 * (i * SIZEY * SIZEZ + j * SIZEZ + k) + 1]
@@ -90,7 +90,7 @@ void WaterRenderer::update() {
     glBindVertexArray(0);
 }
 
-void WaterRenderer::draw() {
+void WaterRenderer3D::draw() {
     shader.use();
 
     if (drawMode == DrawMode::POINT) {
@@ -104,20 +104,19 @@ void WaterRenderer::draw() {
     glBindVertexArray(0);
 }
 
-void WaterRenderer::drawUI() {
-    static size_t curr_i = 0;
+void WaterRenderer3D::drawUI() {
+    static size_t curr_k = 0;
 
     ImGui::Begin("Simulation Data");
-    ImGui::SliderInt("layer(x)", (int *) &curr_i, 0, SIZEX - 1);
+    ImGui::SliderInt("layer(z)", (int *) &curr_k, 0, SIZEZ - 1);
 
     if (ImGui::CollapsingHeader("Pressure")) {
         ImGui::Columns(SIZEZ, "table_p");
         ImGui::Separator();
         for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t k = 0; k < SIZEZ; k++) {
+            for (size_t i = 0; i < SIZEX; i++) {
                 char fstr[32];
-                Eigen::Vector3d v = sim->vel(curr_i, j, k);
-                sprintf(fstr, "%6f", sim->p(curr_i, j, k));
+                sprintf(fstr, "%6f", sim->p(i, SIZEY - 1 - j, curr_k));
                 ImGui::Text(fstr);
                 ImGui::NextColumn();
             }
@@ -130,10 +129,10 @@ void WaterRenderer::drawUI() {
         ImGui::Columns(SIZEZ, "table_vel");
         ImGui::Separator();
         for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t k = 0; k < SIZEZ; k++) {
+            for (size_t i = 0; i < SIZEX; i++) {
                 char fstr[32];
-                Eigen::Vector3d v = sim->vel(curr_i, j, k);
-                sprintf(fstr, "%2.2f %2.2f %2.2f", v(0), v(1), v(2));
+                Vector3d v = sim->mac.vel(i, SIZEY - 1 - j, curr_k);
+                sprintf(fstr, "%2.2f %2.2f %2.2f", v.x, v.y, v.z);
                 ImGui::Text(fstr);
                 ImGui::NextColumn();
             }

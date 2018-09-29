@@ -2,8 +2,8 @@
 // Created by lasagnaphil on 2018-09-17.
 //
 
-#ifndef FLUID_SIM_WATERRENDERER_H
-#define FLUID_SIM_WATERRENDERER_H
+#ifndef FLUID_SIM_WATERRENDERER3D_H
+#define FLUID_SIM_WATERRENDERER3D_H
 
 #include <cstddef>
 #include <glad/glad.h>
@@ -14,7 +14,7 @@
 struct FirstPersonCamera;
 struct WaterSim3D;
 
-class WaterRenderer {
+class WaterRenderer3D {
     static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
     static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
@@ -45,4 +45,4 @@ public:
 };
 
 
-#endif //FLUID_SIM_WATERRENDERER_H
+#endif //FLUID_SIM_WATERRENDERER3D_H
