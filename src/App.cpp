@@ -132,6 +132,14 @@ void App::init(Vector2i screenSize) {
     ImGui::StyleColorsDark();
 
     // load systems
+    waterSim = new WaterSim3D();
+    waterRenderer = new WaterRenderer3D();
+
+    camera = FirstPersonCamera::create(&settings);
+    camera.transform.pos = HMM_Vec3(0.0f, 0.0f, 0.0f);
+
+    waterSim->setup();
+    waterRenderer->setup(waterSim, &camera);
 }
 
 void App::free() {
@@ -141,16 +149,6 @@ void App::free() {
 }
 
 void App::start() {
-    // Init
-    camera = FirstPersonCamera::create(&settings);
-    camera.transform.pos = HMM_Vec3(0.0f, 0.0f, 0.0f);
-
-    waterSim = new WaterSim3D();
-    waterSim->setup();
-
-    waterRenderer = new WaterRenderer3D();
-    waterRenderer->setup(waterSim, &camera);
-
     // Program loop
     Uint32 frameTime;
     Uint32 lastFrameTime = SDL_GetTicks();
