@@ -9,6 +9,8 @@
 #include "Eigen/SparseCore"
 #include "Eigen/IterativeLinearSolvers"
 
+#include "Defer.h"
+
 void WaterSim3D::setup() {
     mac.iterate([&](size_t i, size_t j, size_t k) {
         /*
@@ -107,47 +109,58 @@ void WaterSim3D::applyGravity() {
 }
 
 void WaterSim3D::applyProjection() {
+    /*
     using Triplet = Eigen::Triplet<double>;
     auto triplets = Vec<Triplet>::create(5*SIZEX*SIZEY*SIZEZ);
+    defer {triplets.free();};
+     */
+
+    auto gridStack = Vec<Grid3D<double>>::create(10);
+
+    auto& Adiag = gridStack.newItem();
+    auto& Ax = gridStack.newItem();
+    auto& Ay = gridStack.newItem();
+    auto& Az = gridStack.newItem();
 
     // calculate lhs (matrix A)
     double scaleA = dt / (rho * mac.dx * mac.dx);
     mac.iterate([&](size_t i, size_t j, size_t k) {
         // note: if index is out of bounds, regard the cell as EMPTY
         size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
-        double A_diag = 0, A_plusi = 0, A_plusj = 0, A_plusk = 0;
+        // double A_diag = 0, A_plusi = 0, A_plusj = 0, A_plusk = 0;
         if (cell(i,j,k) == CellType::FLUID) {
             if (cell(i-1,j,k) == CellType::FLUID) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
             if (cell(i+1,j,k) == CellType::FLUID) {
-                A_diag += scaleA;
-                A_plusi = -scaleA;
+                Adiag(i,j,k) += scaleA;
+                Ax(i,j,k) = -scaleA;
             }
             else if (cell(i+1,j,k) == CellType::EMPTY) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
             if (cell(i,j-1,k) == CellType::FLUID) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
             if (cell(i,j+1,k) == CellType::FLUID) {
-                A_diag += scaleA;
-                A_plusj = -scaleA;
+                Adiag(i,j,k) += scaleA;
+                Ay(i,j,k) = -scaleA;
             }
             else if (cell(i,j+1,k) == CellType::EMPTY) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
             if (cell(i,j,k-1) == CellType::FLUID) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
             if (cell(i,j,k+1) == CellType::FLUID) {
-                A_diag += scaleA;
-                A_plusk = -scaleA;
+                Adiag(i,j,k) += scaleA;
+                Az(i,j,k) = -scaleA;
             }
             else if (cell(i,j,k+1) == CellType::EMPTY) {
-                A_diag += scaleA;
+                Adiag(i,j,k) += scaleA;
             }
         }
+        /*
         if (A_diag != 0) {
             triplets.push(Triplet(idx, idx, A_diag));
         }
@@ -163,66 +176,73 @@ void WaterSim3D::applyProjection() {
             triplets.push(Triplet(idx, idx + SIZEY*SIZEX, A_plusk));
             triplets.push(Triplet(idx + SIZEY*SIZEX, idx, A_plusk));
         }
+         */
     });
 
+    /*
     Eigen::SparseMatrix<double> A(SIZEX*SIZEY*SIZEZ, SIZEX*SIZEY*SIZEZ);
     A.setFromTriplets(triplets.data, triplets.data + triplets.size);
-    triplets.free();
 
     Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1> rhs = {};
+     */
+
+    auto& rhs = gridStack.newItem();
+
     // calculate rhs
     {
         double scale = 1 / mac.dx;
         mac.iterate([&](size_t i, size_t j, size_t k) {
             size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
             if (cell(i,j,k) == CellType::FLUID) {
-                rhs(idx) = -mac.velDiv(i,j,k);
+                rhs(i,j,k) = -mac.velDiv(i,j,k);
                 // modify rhs to account for solid velocities
                 // TODO: use usolid, vsolid, wsolid instead of 0
                 if (cell(i-1,j,k) == CellType::SOLID) {
-                    rhs(idx) -= scale * (mac.u(i,j,k) - 0);
+                    rhs(i,j,k) -= scale * (mac.u(i,j,k) - 0);
                 }
                 if (cell(i+1,j,k) == CellType::SOLID) {
-                    rhs(idx) += scale * (mac.u(i+1,j,k) - 0);
+                    rhs(i,j,k) += scale * (mac.u(i+1,j,k) - 0);
                 }
                 if (cell(i,j-1,k) == CellType::SOLID) {
-                    rhs(idx) -= scale * (mac.v(i,j,k) - 0);
+                    rhs(i,j,k) -= scale * (mac.v(i,j,k) - 0);
                 }
                 if (cell(i,j+1,k) == CellType::SOLID) {
-                    rhs(idx) += scale * (mac.v(i,j+1,k) - 0);
+                    rhs(i,j,k) += scale * (mac.v(i,j+1,k) - 0);
                 }
                 if (cell(i,j,k-1) == CellType::SOLID) {
-                    rhs(idx) -= scale * (mac.w(i,j,k) - 0);
+                    rhs(i,j,k) -= scale * (mac.w(i,j,k) - 0);
                 }
                 if (cell(i,j,k+1) == CellType::SOLID) {
-                    rhs(idx) += scale * (mac.w(i,j,k+1) - 0);
+                    rhs(i,j,k) += scale * (mac.w(i,j,k+1) - 0);
                 }
             }
 
         });
     }
 
+    /*
     Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> cg;
     cg.compute(A);
-    Eigen::Map<Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1>> result((double*)p.data);
-    result = cg.solve(rhs);
+    Eigen::Matrix<double, SIZEX*SIZEY*SIZEZ, 1> result = cg.solve(rhs);
+    memcpy(p.data, result.data(), sizeof(double)*SIZEX*SIZEY*SIZEZ);
+    */
 
-    /*
+#define SQUARE(x) (x)*(x)
     // find preconditioner
-    Grid3D<double> precon = {};
+    auto& precon = gridStack.newItem();
     {
         constexpr double tau = 0.97;
         constexpr double sigma = 0.25;
         double e;
-        iterate([&](size_t i, size_t j, size_t k) {
+        mac.iterate([&](size_t i, size_t j, size_t k) {
             if (cell(i, j, k) == CellType::FLUID) {
                 e = Adiag(i,j,k)
-                    - (i > 0? SQUARE(Aplusi(i-1,j,k) * precon(i-1,j,k)) : 0)
-                    - (j > 0? SQUARE(Aplusj(i,j-1,k) * precon(i,j-1,k)) : 0)
-                    - (k > 0? SQUARE(Aplusk(i,j,k-1) * precon(i,j,k-1)) : 0)
-                    - tau * ((i > 0? Aplusi(i-1,j,k)*(Aplusj(i-1,j,k) + Aplusk(i-1,j,k))*SQUARE(precon(i-1,j,k)) : 0)
-                             + (j > 0? Aplusj(i,j-1,k)*(Aplusi(i,j-1,k) + Aplusk(i,j-1,k))*SQUARE(precon(i,j-1,k)) : 0)
-                             + (k > 0? Aplusk(i,j,k-1)*(Aplusi(i,j,k-1) + Aplusj(i,j,k-1))*SQUARE(precon(i,j,k-1)) : 0));
+                    - (i > 0? SQUARE(Ax(i-1,j,k) * precon(i-1,j,k)) : 0)
+                    - (j > 0? SQUARE(Ay(i,j-1,k) * precon(i,j-1,k)) : 0)
+                    - (k > 0? SQUARE(Az(i,j,k-1) * precon(i,j,k-1)) : 0)
+                    - tau * ((i > 0? Ax(i-1,j,k)*(Ay(i-1,j,k) + Az(i-1,j,k))*SQUARE(precon(i-1,j,k)) : 0)
+                             + (j > 0? Ay(i,j-1,k)*(Az(i,j-1,k) + Ax(i,j-1,k))*SQUARE(precon(i,j-1,k)) : 0)
+                             + (k > 0? Az(i,j,k-1)*(Ax(i,j,k-1) + Ay(i,j,k-1))*SQUARE(precon(i,j,k-1)) : 0));
                 if (e < sigma * Adiag(i,j,k)) {
                     e = Adiag(i,j,k);
                 }
@@ -230,29 +250,67 @@ void WaterSim3D::applyProjection() {
             }
         });
     }
+#undef SQUARE
+
+    auto& r = gridStack.newItem();
+    auto& z = gridStack.newItem();
+    auto& s = gridStack.newItem();
+
+    auto applyPreconditioner = [&]() {
+        // apply preconditioner
+        auto& q = gridStack.newItem();
+        defer {gridStack.pop();};
+        mac.iterate([&](size_t i, size_t j, size_t k) {
+            if (cell(i,j,k) == CellType::FLUID) {
+                double t = r(i,j,k) - (i > 0? Ax(i-1,j,k) * precon(i-1,j,k) * q(i-1,j,k) : 0)
+                           - (j > 0? Ay(i,j-1,k) * precon(i,j-1,k) * q(i,j-1,k) : 0)
+                           - (k > 0? Az(i,j,k-1) * precon(i,j,k-1) * q(i,j,k-1) : 0);
+                q(i,j,k) = t * precon(i,j,k);
+            }
+        });
+        mac.iterateBackwards([&](size_t i, size_t j, size_t k) {
+            if (cell(i,j,k) == CellType::FLUID) {
+                double t = q(i,j,k) - (i < SIZEX - 1? Ax(i,j,k) * precon(i,j,k) * z(i+1,j,k) : 0)
+                           - (j < SIZEY - 1? Ay(i,j,k) * precon(i,j,k) * z(i,j+1,k) : 0)
+                           - (k < SIZEZ - 1? Az(i,j,k) * precon(i,j,k) * z(i,j,k+1) : 0);
+                z(i,j,k) = t * precon(i,j,k);
+            }
+        });
+    };
 
     // use PCG algorithm to solve the linear equation
-    Grid3D<double> r = rhs;
-    Grid3D<double> z = applyPreconditioner(r, precon, Aplusi, Aplusj, Aplusk);
-    Grid3D<double> s = z;
+    r = rhs;
+    applyPreconditioner();
+    s = z;
     double sigma = z.innerProduct(r);
     int maxIters = 10;
     int iter = 0;
     while (iter < maxIters) {
-        z = applyA(s, Adiag, Aplusi, Aplusj, Aplusk);
+        // apply A
+        mac.iterate([&](size_t i, size_t j, size_t k) {
+            z(i,j,k) = Adiag(i,j,k)*r(i,j,k)
+                       + (i > 0? Ax(i-1,j,k)*r(i-1,j,k) : 0)
+                       + (i < SIZEX - 1? Ax(i,j,k)*r(i+1,j,k) : 0)
+                       + (j > 0? Ay(i,j-1,k)*r(i,j-1,k) : 0)
+                       + (j < SIZEY - 1? Ay(i,j,k)*r(i,j+1,k) : 0)
+                       + (k > 0? Az(i,j,k-1)*r(i,j,k-1) : 0)
+                       + (k < SIZEZ - 1? Az(i,j,k)*r(i,j,k+1) : 0);
+        });
+
         double alpha = sigma / z.innerProduct(s);
-        p += alpha * s;
-        r -= alpha * z;
+        p.setMultiplyAdd(p, alpha, s);
+        r.setMultiplyAdd(r, -alpha, z);
         if (r.infiniteNorm() <= 1e-6) { break; }
-        z = applyPreconditioner(r, precon, Aplusi, Aplusj, Aplusk);
+
+        applyPreconditioner();
+
         double sigma_new = z.innerProduct(r);
         double beta = sigma_new / sigma;
-        s = z + beta * s;
+        s.setMultiplyAdd(z, beta, s);
         sigma = sigma_new;
 
         iter++;
     }
-     */
 
     // update velocity using the solved pressure
     {
@@ -290,47 +348,6 @@ void WaterSim3D::applyProjection() {
             }
         });
     }
-}
 
-WaterSim3D::Grid3D<double> WaterSim3D::applyA(const WaterSim3D::Grid3D<double> &r, const WaterSim3D::Grid3D<double> &Adiag,
-                                          const WaterSim3D::Grid3D<double> &Aplusi,
-                                          const WaterSim3D::Grid3D<double> &Aplusj,
-                                          const WaterSim3D::Grid3D<double> &Aplusk) {
-    Grid3D<double> z;
-    mac.iterate([&](size_t i, size_t j, size_t k) {
-        z(i,j,k) = Adiag(i,j,k)*r(i,j,k)
-                   + (i > 0? Aplusi(i-1,j,k)*r(i-1,j,k) : 0)
-                   + (i < SIZEX - 1? Aplusi(i,j,k)*r(i+1,j,k) : 0)
-                   + (j > 0? Aplusj(i,j-1,k)*r(i,j-1,k) : 0)
-                   + (j < SIZEY - 1? Aplusj(i,j,k)*r(i,j+1,k) : 0)
-                   + (k > 0? Aplusk(i,j,k-1)*r(i,j,k-1) : 0)
-                   + (k < SIZEZ - 1? Aplusk(i,j,k)*r(i,j,k+1) : 0);
-    });
-    return z;
+    gridStack.free();
 }
-
-WaterSim3D::Grid3D<double>
-WaterSim3D::applyPreconditioner(const WaterSim3D::Grid3D<double> &r, const WaterSim3D::Grid3D<double> &precon,
-                              const WaterSim3D::Grid3D<double> &Aplusi, const WaterSim3D::Grid3D<double> &Aplusj,
-                              const WaterSim3D::Grid3D<double> &Aplusk) {
-    Grid3D<double> q = {};
-    mac.iterate([&](size_t i, size_t j, size_t k) {
-        if (cell(i,j,k) == CellType::FLUID) {
-            double t = r(i,j,k) - (i > 0? Aplusi(i-1,j,k) * precon(i-1,j,k) * q(i-1,j,k) : 0)
-                       - (j > 0? Aplusj(i,j-1,k) * precon(i,j-1,k) * q(i,j-1,k) : 0)
-                       - (k > 0? Aplusk(i,j,k-1) * precon(i,j,k-1) * q(i,j,k-1) : 0);
-            q(i,j,k) = t * precon(i,j,k);
-        }
-    });
-    Grid3D<double> z = {};
-    mac.iterateBackwards([&](size_t i, size_t j, size_t k) {
-        if (cell(i,j,k) == CellType::FLUID) {
-            double t = q(i,j,k) - (i < SIZEX - 1? Aplusi(i,j,k) * precon(i,j,k) * z(i+1,j,k) : 0)
-                       - (j < SIZEY - 1? Aplusi(i,j,k) * precon(i,j,k) * z(i,j+1,k) : 0)
-                       - (k < SIZEZ - 1? Aplusi(i,j,k) * precon(i,j,k) * z(i,j,k+1) : 0);
-            z(i,j,k) = t * precon(i,j,k);
-        }
-    });
-    return z;
-}
-

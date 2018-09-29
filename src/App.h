@@ -30,8 +30,8 @@ struct App {
     AppSettings settings;
 
     FirstPersonCamera camera;
-    WaterSim3D waterSim;
-    WaterRenderer3D waterRenderer;
+    WaterSim3D* waterSim;
+    WaterRenderer3D* waterRenderer;
 };
 
 #endif //FLUID_SIM_APP_H

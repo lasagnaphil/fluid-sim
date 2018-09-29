@@ -135,6 +135,8 @@ void App::init(Vector2i screenSize) {
 }
 
 void App::free() {
+    delete waterSim;
+    delete waterRenderer;
     SDL_DestroyWindow(window);
 }
 
@@ -143,8 +145,11 @@ void App::start() {
     camera = FirstPersonCamera::create(&settings);
     camera.transform.pos = HMM_Vec3(0.0f, 0.0f, 0.0f);
 
-    waterSim.setup();
-    waterRenderer.setup(&waterSim, &camera);
+    waterSim = new WaterSim3D();
+    waterSim->setup();
+
+    waterRenderer = new WaterRenderer3D();
+    waterRenderer->setup(waterSim, &camera);
 
     // Program loop
     Uint32 frameTime;
@@ -186,8 +191,8 @@ void App::start() {
 
         InputManager::get()->update();
         camera.update(dt);
-        waterSim.update();
-        waterRenderer.update();
+        waterSim->update();
+        waterRenderer->update();
 
         //
         // Render
@@ -201,9 +206,9 @@ void App::start() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        waterRenderer.draw();
+        waterRenderer->draw();
 
-        waterRenderer.drawUI();
+        waterRenderer->drawUI();
 
         ImGui::Begin("Camera Info");
         ImGui::Text("pos: %f %f %f", camera.transform.pos.X, camera.transform.pos.Y, camera.transform.pos.Z);
