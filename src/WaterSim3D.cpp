@@ -34,19 +34,27 @@ void WaterSim3D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
+    rendered = false;
 }
 
 void WaterSim3D::update() {
-    static int stage = 0;
+    static int nextStage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        if (stage == 0)
+        if (nextStage == 0) {
             applyAdvection();
-        else if (stage == 1)
+            stage = Stage::ADVECTION;
+        }
+        else if (nextStage == 1) {
             applyGravity();
-        else if (stage == 2)
+            stage = Stage::GRAVITY;
+        }
+        else if (nextStage == 2) {
             applyProjection();
-        stage = (stage + 1) % 3;
+            stage = Stage::PROJECTION;
+        }
+        nextStage = (nextStage + 1) % 3;
+        rendered = false;
     }
 }
 

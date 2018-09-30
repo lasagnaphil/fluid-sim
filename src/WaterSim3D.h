@@ -29,6 +29,12 @@ struct WaterSim3D {
     double rho = 1000.0;
     double dt = 1.0 / 60.0;
 
+    bool rendered = false;
+    enum Stage {
+        READY = 0, ADVECTION, GRAVITY, PROJECTION
+    };
+    Stage stage = Stage::READY;
+
     void setup();
 
     void runFrame();

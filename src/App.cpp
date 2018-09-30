@@ -136,7 +136,7 @@ void App::init(Vector2i screenSize) {
     waterRenderer = new WaterRenderer3D();
 
     camera = FirstPersonCamera::create(&settings);
-    camera.transform.pos = HMM_Vec3(0.0f, 0.0f, 0.0f);
+    camera.transform.pos = HMM_Vec3(0.3f, 0.3f, 1.8f);
 
     waterSim->setup();
     waterRenderer->setup(waterSim, &camera);

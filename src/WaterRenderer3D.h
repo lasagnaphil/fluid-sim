@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <glad/glad.h>
+#include <StackVec.h>
 #include "HandmadeMath.h"
 #include "Shader.h"
 #include "WaterSimSettings.h"
@@ -21,20 +22,29 @@ class WaterRenderer3D {
     static constexpr int ENABLE_DEBUG_UI = WaterSimSettings::Dim3D::ENABLE_DEBUG_UI;
 
     enum class DrawMode {
-        POINT, LINE
+        POINT, LINE, VOXEL
     };
     DrawMode drawMode = DrawMode::POINT;
     static constexpr float CELL_SIZE = 1.0f / SIZEY;
     static constexpr float VEL_LINE_SCALE = 1.0f / SIZEY;
     static constexpr size_t POINT_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ;
     static constexpr size_t LINE_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ * 2;
+
     GLuint lineVAO;
     GLuint pointVAO;
     GLuint lineVBO;
     GLuint lineTypeVBO;
+    GLuint voxelVAO;
+    GLuint voxelVertexVBO;
+    GLuint cellOffsetVBO;
+
     hmm_vec3 vertices[LINE_VERTEX_COUNT];
     hmm_vec4 vertexColors[LINE_VERTEX_COUNT];
-    Shader shader;
+    float cubeVertices[3*36];
+    StackVec<hmm_vec3, LINE_VERTEX_COUNT> waterVoxelLocations = {};
+
+    Shader lineShader;
+    Shader voxelShader;
 
     WaterSim3D* sim;
 
@@ -43,6 +53,9 @@ public:
     void update();
     void draw();
     void drawUI();
+
+private:
+    void updateWaterVoxelLocations();
 };
 
 

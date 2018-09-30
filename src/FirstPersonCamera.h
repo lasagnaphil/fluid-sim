@@ -28,7 +28,7 @@ struct IntRect {
 class FirstPersonCamera {
 public:
     struct Settings {
-        static constexpr float Yaw = -90.0f;
+        static constexpr float Yaw = 0.0f;
         static constexpr float Pitch = 0.0f;
         static constexpr float Speed = 1.0f;
         static constexpr float Sensitivity = 0.02f;
