@@ -76,14 +76,14 @@ struct MACGrid3D {
         else if (i == 0)
             return Vector3d::create(
                     u(i,j,k),
-                    0.5 * (v(i,j,k) + v(i,j+1,k)),
-                    0.5 * (w(i,j,k) + w(i,j,k+1))
+                    0.25 * (v(i,j,k) + v(i,j+1,k)),
+                    0.25 * (w(i,j,k) + w(i,j,k+1))
             );
         else
             return Vector3d::create(
                     u(i,j,k),
-                    0.5 * (v(i-1,j,k) + v(i-1,j+1,k)),
-                    0.5 * (w(i-1,j,k) + w(i-1,j,k+1))
+                    0.25 * (v(i-1,j,k) + v(i-1,j+1,k)),
+                    0.25 * (w(i-1,j,k) + w(i-1,j,k+1))
             );
     }
 
@@ -96,15 +96,15 @@ struct MACGrid3D {
             );
         else if (j == 0)
             return Vector3d::create(
-                    0.5 * (u(i,j,k) + u(i+1,j,k)),
+                    0.25 * (u(i,j,k) + u(i+1,j,k)),
                     v(i,j,k),
-                    0.5 * (w(i,j,k) + w(i,j,k+1))
+                    0.25 * (w(i,j,k) + w(i,j,k+1))
             );
         else
             return Vector3d::create(
-                    0.5 * (u(i,j-1,k) + u(i+1,j-1,k)),
+                    0.25 * (u(i,j-1,k) + u(i+1,j-1,k)),
                     v(i,j,k),
-                    0.5 * (w(i,j-1,k) + w(i,j-1,k+1))
+                    0.25 * (w(i,j-1,k) + w(i,j-1,k+1))
             );
     }
 
@@ -117,14 +117,14 @@ struct MACGrid3D {
             );
         else if (k == 0)
             return Vector3d::create(
-                    0.5 * (u(i,j,k) + u(i+1,j,k)),
-                    0.5 * (v(i,j,k) + v(i,j+1,k)),
+                    0.25 * (u(i,j,k) + u(i+1,j,k)),
+                    0.25 * (v(i,j,k) + v(i,j+1,k)),
                     w(i,j,k)
             );
         else
             return Vector3d::create(
-                    0.5 * (u(i,j,k-1) + u(i+1,j,k-1)),
-                    0.5 * (v(i,j,k-1) + v(i,j+1,k-1)),
+                    0.25 * (u(i,j,k-1) + u(i+1,j,k-1)),
+                    0.25 * (v(i,j,k-1) + v(i,j+1,k-1)),
                     w(i,j,k)
             );
     }

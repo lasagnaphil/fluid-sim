@@ -2,6 +2,7 @@
 // Created by lasagnaphil on 2/8/18.
 //
 
+#include <imgui.h>
 #include "App.h"
 
 #include "FirstPersonCamera.h"
@@ -40,6 +41,11 @@ void FirstPersonCamera::update(float dt) {
     // Update based on mouse / keyboard input
     //
     auto inputMgr = InputManager::get();
+
+    if (inputMgr->isKeyEntered(SDL_SCANCODE_M)) {
+        mouseMovementEnabled = !mouseMovementEnabled;
+        SDL_SetRelativeMouseMode(mouseMovementEnabled? SDL_TRUE : SDL_FALSE);
+    }
 
     // Mouse movement
     if (mouseMovementEnabled) {
@@ -135,6 +141,15 @@ hmm_mat4 FirstPersonCamera::getViewMatrix() const {
 }
 
 hmm_mat4 FirstPersonCamera::getProjMatrix() const {
-    hmm_mat4 proj = HMM_Perspective(zoom, settings->screenSize.x / settings->screenSize.y, 0.01f, 1000.f);
+    hmm_mat4 proj = HMM_Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
     return proj;
+}
+
+void FirstPersonCamera::drawUI() {
+    ImGui::Begin("Camera Info");
+    ImGui::Text("pos: %f %f %f", transform.pos.X, transform.pos.Y, transform.pos.Z);
+    ImGui::Text("rot: %f %f %f %f", transform.rot.X, transform.rot.Y, transform.rot.Z, transform.rot.W);
+    ImGui::Text("scale: %f %f %f", transform.scale.X, transform.scale.Y, transform.scale.Z);
+    ImGui::Text("pitch: %f, yaw: %f", pitch, yaw);
+    ImGui::End();
 }

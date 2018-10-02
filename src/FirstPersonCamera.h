@@ -62,8 +62,10 @@ public:
 
     hmm_mat4 getProjMatrix() const;
 
+    void drawUI();
+
     AppSettings* settings;
-    StackVec<Shader*, 4> shaders;
+    StackVec<Shader*, 4> shaders = {};
 
     float pitch;
     float yaw;

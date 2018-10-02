@@ -28,12 +28,6 @@ GLuint compile_shader(GLenum type, const GLchar *source) {
 }
 
 Shader Shader::create(const char* vertexPath, const char* fragmentPath) {
-    Shader shader;
-    shader.id = glCreateProgram();
-
-    shader.vertexPath = SYM(vertexPath);
-    shader.fragmentPath = SYM(fragmentPath);
-
     File vertexFile = File::open(vertexPath, "rb+").unwrap();
     String vertexCode = vertexFile.readAll().unwrap();
     defer {vertexCode.free();};
@@ -42,9 +36,17 @@ Shader Shader::create(const char* vertexPath, const char* fragmentPath) {
     String fragmentCode = fragmentFile.readAll().unwrap();
     defer {fragmentCode.free();};
     fragmentFile.close();
+    return Shader::fromStr(vertexCode.data(), fragmentCode.data());
+}
 
-    GLuint vertexShaderPtr = compile_shader(GL_VERTEX_SHADER, vertexCode.data());
-    GLuint fragmentShaderPtr = compile_shader(GL_FRAGMENT_SHADER, fragmentCode.data());
+Shader Shader::fromStr(const char* vertexStr, const char* fragmentStr) {
+    Shader shader;
+    shader.id = glCreateProgram();
+    shader.vertexPath = SYM("<memory>");
+    shader.fragmentPath = SYM("<memory>");
+
+    GLuint vertexShaderPtr = compile_shader(GL_VERTEX_SHADER, vertexStr);
+    GLuint fragmentShaderPtr = compile_shader(GL_FRAGMENT_SHADER, fragmentStr);
     glAttachShader(shader.id, vertexShaderPtr);
     glAttachShader(shader.id, fragmentShaderPtr);
     glLinkProgram(shader.id);
@@ -107,3 +109,4 @@ json::Value Shader::serialize() {
     json.addField("fragmentPath", StringPool::inst.getStr(fragmentPath).data);
     return json;
 }
+

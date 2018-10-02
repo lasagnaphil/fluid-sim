@@ -7,15 +7,16 @@
 
 struct WaterSimSettings {
     struct Dim3D {
-        static constexpr int SIZEX = 15;
-        static constexpr int SIZEY = 15;
-        static constexpr int SIZEZ = 15;
+        static constexpr int SIZEX = 16;
+        static constexpr int SIZEY = 16;
+        static constexpr int SIZEZ = 16;
         static constexpr bool ENABLE_DEBUG_UI = true;
     };
 
     struct Dim2D {
-        static constexpr int SIZEX = 100;
-        static constexpr int SIZEY = 100;
+        static constexpr int SIZEX = 20;
+        static constexpr int SIZEY = 20;
+        static constexpr bool ENABLE_DEBUG_UI = true;
     };
 };
 

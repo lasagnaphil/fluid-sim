@@ -7,19 +7,23 @@
 
 #include <math/Vector2.h>
 #include <SDL.h>
+
 #include "FirstPersonCamera.h"
-#include "WaterSim3D.h"
+#include "Camera2D.h"
+#include "WaterRenderer2D.h"
 #include "WaterRenderer3D.h"
 
 struct AppSettings {
     Vector2i screenSize = {800, 600};
-    bool isMouseRelative = true;
 };
 
 struct App {
+    enum class Mode {
+        Dim2, Dim3
+    };
     static constexpr int MAX_SHADERS = 16;
 
-    void init(Vector2i screenSize);
+    void init(Vector2i screenSize, Mode mode);
     void free();
     void start();
 
@@ -28,10 +32,15 @@ struct App {
 
     bool quit = false;
     AppSettings settings;
+    Mode mode;
 
-    FirstPersonCamera camera;
-    WaterSim3D* waterSim;
-    WaterRenderer3D* waterRenderer;
+    FirstPersonCamera fpsCamera;
+    Camera2D camera2d;
+
+    WaterSim2D* waterSim2D;
+    WaterRenderer2D* waterRenderer2D;
+    WaterSim3D* waterSim3D;
+    WaterRenderer3D* waterRenderer3D;
 };
 
 #endif //FLUID_SIM_APP_H

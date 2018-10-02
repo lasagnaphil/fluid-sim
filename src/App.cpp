@@ -11,10 +11,15 @@
 #include "Defer.h"
 #include "log.h"
 
-#include "InputManager.h"
-
 #define HANDMADE_MATH_IMPLEMENTATION
 #include "HandmadeMath.h"
+
+#include "InputManager.h"
+
+#include "WaterSim3D.h"
+#include "WaterSim2D.h"
+#include "WaterRenderer2D.h"
+#include "WaterRenderer3D.h"
 
 static void sdl_die(const char* message) {
     log_error("%s: %s\n", message, SDL_GetError());
@@ -30,38 +35,39 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id, GLenum severi
 
     switch (source)
     {
-        case GL_DEBUG_SOURCE_API:             log_debug("Source: API"); break;
-        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   log_debug("Source: Window System"); break;
-        case GL_DEBUG_SOURCE_SHADER_COMPILER: log_debug("Source: Shader Compiler"); break;
-        case GL_DEBUG_SOURCE_THIRD_PARTY:     log_debug("Source: Third Party"); break;
-        case GL_DEBUG_SOURCE_APPLICATION:     log_debug("Source: Application"); break;
-        case GL_DEBUG_SOURCE_OTHER:           log_debug("Source: Other"); break;
+        case GL_DEBUG_SOURCE_API:             printf("Source: API"); break;
+        case GL_DEBUG_SOURCE_WINDOW_SYSTEM:   printf("Source: Window System"); break;
+        case GL_DEBUG_SOURCE_SHADER_COMPILER: printf("Source: Shader Compiler"); break;
+        case GL_DEBUG_SOURCE_THIRD_PARTY:     printf("Source: Third Party"); break;
+        case GL_DEBUG_SOURCE_APPLICATION:     printf("Source: Application"); break;
+        case GL_DEBUG_SOURCE_OTHER:           printf("Source: Other"); break;
     }
 
     switch (type)
     {
-        case GL_DEBUG_TYPE_ERROR:               log_debug("Type: Error"); break;
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: log_debug("Type: Deprecated Behaviour"); break;
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  log_debug("Type: Undefined Behaviour"); break;
-        case GL_DEBUG_TYPE_PORTABILITY:         log_debug("Type: Portability"); break;
-        case GL_DEBUG_TYPE_PERFORMANCE:         log_debug("Type: Performance"); break;
-        case GL_DEBUG_TYPE_MARKER:              log_debug("Type: Marker"); break;
-        case GL_DEBUG_TYPE_PUSH_GROUP:          log_debug("Type: Push Group"); break;
-        case GL_DEBUG_TYPE_POP_GROUP:           log_debug("Type: Pop Group"); break;
-        case GL_DEBUG_TYPE_OTHER:               log_debug("Type: Other"); break;
+        case GL_DEBUG_TYPE_ERROR:               printf("Type: Error"); break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: printf("Type: Deprecated Behaviour"); break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:  printf("Type: Undefined Behaviour"); break;
+        case GL_DEBUG_TYPE_PORTABILITY:         printf("Type: Portability"); break;
+        case GL_DEBUG_TYPE_PERFORMANCE:         printf("Type: Performance"); break;
+        case GL_DEBUG_TYPE_MARKER:              printf("Type: Marker"); break;
+        case GL_DEBUG_TYPE_PUSH_GROUP:          printf("Type: Push Group"); break;
+        case GL_DEBUG_TYPE_POP_GROUP:           printf("Type: Pop Group"); break;
+        case GL_DEBUG_TYPE_OTHER:               printf("Type: Other"); break;
     }
 
     switch (severity)
     {
-        case GL_DEBUG_SEVERITY_HIGH:         log_debug("Severity: high"); break;
-        case GL_DEBUG_SEVERITY_MEDIUM:       log_debug("Severity: medium"); break;
-        case GL_DEBUG_SEVERITY_LOW:          log_debug("Severity: low"); break;
-        case GL_DEBUG_SEVERITY_NOTIFICATION: log_debug("Severity: notification"); break;
+        case GL_DEBUG_SEVERITY_HIGH:         printf("Severity: high"); break;
+        case GL_DEBUG_SEVERITY_MEDIUM:       printf("Severity: medium"); break;
+        case GL_DEBUG_SEVERITY_LOW:          printf("Severity: low"); break;
+        case GL_DEBUG_SEVERITY_NOTIFICATION: printf("Severity: notification"); break;
     }
 }
 
-void App::init(Vector2i screenSize) {
+void App::init(Vector2i screenSize, Mode mode) {
     settings.screenSize = screenSize;
+    this->mode = mode;
 
     if (SDL_Init(SDL_INIT_VIDEO)) {
         sdl_die("Couldn't initialize SDL");
@@ -77,12 +83,10 @@ void App::init(Vector2i screenSize) {
 
     // Create the window
     window = SDL_CreateWindow(
-            "Dynamic Desert",
+            "Water Simulation",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             screenSize.x, screenSize.y, SDL_WINDOW_OPENGL
     );
-
-    SDL_SetRelativeMouseMode(SDL_TRUE);
 
     if (window == NULL) sdl_die("Couldn't set video mode");
 
@@ -132,19 +136,37 @@ void App::init(Vector2i screenSize) {
     ImGui::StyleColorsDark();
 
     // load systems
-    waterSim = new WaterSim3D();
-    waterRenderer = new WaterRenderer3D();
+    if (mode == Mode::Dim2) {
+        waterSim2D = new WaterSim2D();
+        waterRenderer2D = new WaterRenderer2D();
+        camera2d = Camera2D::create(&settings, HMM_Vec2(0.0f, 0.0f));
+    }
+    else if (mode == Mode::Dim3) {
+        waterSim3D = new WaterSim3D();
+        waterRenderer3D = new WaterRenderer3D();
+        fpsCamera = FirstPersonCamera::create(&settings);
+        fpsCamera.transform.pos = HMM_Vec3(0.5f, 0.5f, 3.0f);
+    }
 
-    camera = FirstPersonCamera::create(&settings);
-    camera.transform.pos = HMM_Vec3(0.3f, 0.3f, 1.8f);
-
-    waterSim->setup();
-    waterRenderer->setup(waterSim, &camera);
+    if (mode == Mode::Dim2) {
+        waterSim2D->setup();
+        waterRenderer2D->setup(waterSim2D, &camera2d);
+    }
+    else if (mode == Mode::Dim3) {
+        waterSim3D->setup();
+        waterRenderer3D->setup(waterSim3D, &fpsCamera);
+    }
 }
 
 void App::free() {
-    delete waterSim;
-    delete waterRenderer;
+    if (mode == Mode::Dim2) {
+        delete waterSim2D;
+        delete waterRenderer2D;
+    }
+    else if (mode == Mode::Dim3) {
+        delete waterSim3D;
+        delete waterRenderer3D;
+    }
     SDL_DestroyWindow(window);
 }
 
@@ -171,12 +193,6 @@ void App::start() {
                     case SDLK_ESCAPE:
                         quit = true;
                         break;
-                    case SDLK_m: {
-                        settings.isMouseRelative = !settings.isMouseRelative;
-                        SDL_SetRelativeMouseMode(settings.isMouseRelative? SDL_TRUE : SDL_FALSE);
-                        camera.mouseMovementEnabled = settings.isMouseRelative;
-                        break;
-                    }
                 }
             }
         }
@@ -188,9 +204,16 @@ void App::start() {
         lastFrameTime = frameTime;
 
         InputManager::get()->update();
-        camera.update(dt);
-        waterSim->update();
-        waterRenderer->update();
+        if (mode == Mode::Dim2) {
+            camera2d.update(dt);
+            waterSim2D->update();
+            waterRenderer2D->update();
+        }
+        else if (mode == Mode::Dim3) {
+            fpsCamera.update(dt);
+            waterSim3D->update();
+            waterRenderer3D->update();
+        }
 
         //
         // Render
@@ -204,16 +227,25 @@ void App::start() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        waterRenderer->draw();
+        // draw
+        if (mode == Mode::Dim2) {
+            waterRenderer2D->draw();
+            camera2d.drawUI();
+        }
+        else if (mode == Mode::Dim3) {
+            waterRenderer3D->draw();
+            fpsCamera.drawUI();
+        }
 
-        waterRenderer->drawUI();
-
-        ImGui::Begin("Camera Info");
-        ImGui::Text("pos: %f %f %f", camera.transform.pos.X, camera.transform.pos.Y, camera.transform.pos.Z);
-        ImGui::Text("rot: %f %f %f %f", camera.transform.rot.X, camera.transform.rot.Y, camera.transform.rot.Z, camera.transform.rot.W);
-        ImGui::Text("scale: %f %f %f", camera.transform.scale.X, camera.transform.scale.Y, camera.transform.scale.Z);
-        ImGui::Text("pitch: %f, yaw: %f", camera.pitch, camera.yaw);
-        ImGui::End();
+        // draw UI
+        if (mode == Mode::Dim2) {
+            waterRenderer2D->drawUI();
+            camera2d.drawUI();
+        }
+        else if (mode == Mode::Dim3) {
+            waterRenderer3D->drawUI();
+            fpsCamera.drawUI();
+        }
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

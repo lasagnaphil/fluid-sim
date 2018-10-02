@@ -2,6 +2,7 @@
 // Created by lasagnaphil on 2018-09-18.
 //
 
+#include <Defer.h>
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
@@ -20,34 +21,52 @@ void WaterSim2D::setup() {
     });
 }
 
+Vector2d WaterSim2D::clampPos(Vector2d pos) {
+    Vector2d clamped = {};
+    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX);
+    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY);
+    return clamped;
+}
+
 void WaterSim2D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
+    rendered = false;
 }
 
 void WaterSim2D::update() {
+    static int nextStage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        runFrame();
+        if (nextStage == 0) {
+            applyAdvection();
+        }
+        else if (nextStage == 1) {
+            applyGravity();
+        }
+        else if (nextStage == 2) {
+            applyProjection();
+        }
+        nextStage = (nextStage + 1) % 3;
+        rendered = false;
     }
 }
 
 void WaterSim2D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j) {
-        Vector2d u_pos = Vector2d::create((double)i - 0.5, j);
+        Vector2d u_pos = Vector2d::create((double)i, (double)j + 0.5);
         Vector2d x_mid = u_pos - 0.5 * dt * mac.velU(i, j);
         Vector2d x_mid_cl = clampPos(x_mid);
         Vector2d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
-        double vInterp = mac.velInterp(x_p).x;
-        mac.u(i,j) = vInterp;
+        mac.u(i,j) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j) {
-        Vector2d v_pos = Vector2d::create(i, (double)j - 0.5);
+        Vector2d v_pos = Vector2d::create((double)i + 0.5, (double)j);
         Vector2d x_mid = v_pos - 0.5 * dt * mac.velV(i, j);
         Vector2d x_mid_cl = clampPos(x_mid);
         Vector2d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
-        mac.v(i,j) = mac.velInterp(x_p).y;
+        mac.v(i,j) = mac.velInterpV(x_p);
     });
 }
 
@@ -61,69 +80,172 @@ void WaterSim2D::applyGravity() {
 }
 
 void WaterSim2D::applyProjection() {
-    // TODO
-    /*
-    Eigen::SparseMatrix<double> A(SIZEX*SIZEY, SIZEX*SIZEY);
-    Eigen::Matrix<double, SIZEX*SIZEY, 1> rhs = {};
+    auto gridStack = Vec<Grid2D<double>>::create(9);
 
-#define A_DIAG(__i,__j) A.insert(__j*SIZEX + __i,__j*SIZEX + __i)
-#define A_PLUSI(__i,__j,__v) \
-A.insert(__j*SIZEX + __i,__j*SIZEX + __i+1) = __v; \
-A.insert(__j*SIZEX + __i+1,__j*SIZEX + __i+1) = __v;
-#define A_PLUSJ(__i,__j,__v) \
-A.insert(__j*SIZEX + __i,(__j+1)*SIZEX + __i) = __v; \
-A.insert((__j+1)*SIZEX + __i,__j*SIZEX + __i) = __v;
+    auto& Adiag = gridStack.newItem();
+    auto& Ax = gridStack.newItem();
+    auto& Ay = gridStack.newItem();
 
+    // calculate lhs (matrix A)
     double scaleA = dt / (rho * mac.dx * mac.dx);
     mac.iterate([&](size_t i, size_t j) {
-        if (cell(i-1,j) == CellType::FLUID) {
-            A_DIAG(i,j) += scaleA;
-        }
-        if (cell(i+1,j) == CellType::FLUID) {
-            A_DIAG(i,j) += scaleA;
-            A_PLUSI(i,j,-scaleA);
-        }
-        else if (cell(i+1,j) == CellType::EMPTY) {
-            A_DIAG(i,j) += scaleA;
-        }
-        if (cell(i,j-1) == CellType::FLUID) {
-            A_DIAG(i,j) += scaleA;
-        }
-        if (cell(i,j+1) == CellType::FLUID) {
-            A_DIAG(i,j) += scaleA;
-            A_PLUSJ(i,j,-scaleA);
-        }
-        else if (cell(i,j+1) == CellType::EMPTY) {
-            A_DIAG(i,j) += scaleA;
-        }
-    });
-
-#undef A_DIAG
-#undef A_PLUSI
-#undef A_PLUSJ
-
-    double scale = 1 / mac.dx;
-    mac.iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
-            rhs(j*SIZEX+i) = -mac.velDiv(i,j);
-            if (cell(i-1,j) == CellType::SOLID) {
-                rhs(j*SIZEX+i) -= scale * (mac.u(i,j) - 0);
+            if (cell(i-1,j) == CellType::FLUID) {
+                Adiag(i,j) += scaleA;
             }
-            if (cell(i+1,j) == CellType::SOLID) {
-                rhs(j*SIZEX+i) += scale * (mac.u(i+1,j) - 0);
+            if (cell(i+1,j) == CellType::FLUID) {
+                Adiag(i,j) += scaleA;
+                Ax(i,j) = -scaleA;
             }
-            if (cell(i,j-1) == CellType::SOLID) {
-                rhs(j*SIZEX+i) -= scale * (mac.v(i,j) - 0);
+            else if (cell(i+1,j) == CellType::EMPTY) {
+                Adiag(i,j) += scaleA;
             }
-            if (cell(i,j+1) == CellType::SOLID) {
-                rhs(j*SIZEX+i) += scale * (mac.v(i,j+1) - 0);
+            if (cell(i,j-1) == CellType::FLUID) {
+                Adiag(i,j) += scaleA;
+            }
+            if (cell(i,j+1) == CellType::FLUID) {
+                Adiag(i,j) += scaleA;
+                Ay(i,j) = -scaleA;
+            }
+            else if (cell(i,j+1) == CellType::EMPTY) {
+                Adiag(i,j) += scaleA;
             }
         }
     });
 
-    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> cg;
-    cg.compute(A);
-    Eigen::Matrix<double, SIZEX*SIZEY, 1> sol = cg.solve(rhs);
-    memcpy(p.data, sol.data(), sizeof(double)*SIZEX*SIZEY);
-     */
+    auto& rhs = gridStack.newItem();
+
+    // calculate rhs
+    {
+        double scale = 1 / mac.dx;
+        mac.iterate([&](size_t i, size_t j) {
+            if (cell(i,j) == CellType::FLUID) {
+                rhs(i,j) = -mac.velDiv(i,j);
+                // modify rhs to account for solid velocities
+                // TODO: use usolid, vsolid, wsolid instead of 0
+                if (cell(i-1,j) == CellType::SOLID) {
+                    rhs(i,j) -= scale * (mac.u(i,j) - 0);
+                }
+                if (cell(i+1,j) == CellType::SOLID) {
+                    rhs(i,j) += scale * (mac.u(i+1,j) - 0);
+                }
+                if (cell(i,j-1) == CellType::SOLID) {
+                    rhs(i,j) -= scale * (mac.v(i,j) - 0);
+                }
+                if (cell(i,j+1) == CellType::SOLID) {
+                    rhs(i,j) += scale * (mac.v(i,j+1) - 0);
+                }
+            }
+
+        });
+    }
+
+#define SQUARE(x) (x)*(x)
+    // find preconditioner
+    auto& precon = gridStack.newItem();
+    {
+        constexpr double tau = 0.97;
+        constexpr double sigma = 0.25;
+        double e;
+        mac.iterate([&](size_t i, size_t j) {
+            if (cell(i, j) == CellType::FLUID) {
+                e = Adiag(i,j)
+                    - (i > 0? SQUARE(Ax(i-1,j) * precon(i-1,j)) : 0)
+                    - (j > 0? SQUARE(Ay(i,j-1) * precon(i,j-1)) : 0)
+                    - tau * ((i > 0? Ax(i-1,j)*Ay(i-1,j)*SQUARE(precon(i-1,j)) : 0)
+                             + (j > 0? Ay(i,j-1)*Ax(i,j-1)*SQUARE(precon(i,j-1)) : 0));
+                if (e < sigma * Adiag(i,j)) {
+                    e = Adiag(i,j);
+                }
+                precon(i,j) = 1 / sqrt(e);
+            }
+        });
+    }
+#undef SQUARE
+
+    auto& r = gridStack.newItem();
+    auto& z = gridStack.newItem();
+    auto& s = gridStack.newItem();
+
+    auto applyPreconditioner = [&]() {
+        // apply preconditioner
+        auto& q = gridStack.newItem();
+        defer {gridStack.pop();};
+        mac.iterate([&](size_t i, size_t j) {
+            if (cell(i,j) == CellType::FLUID) {
+                double t = r(i,j) - (i > 0? Ax(i-1,j) * precon(i-1,j) * q(i-1,j) : 0)
+                           - (j > 0? Ay(i,j-1) * precon(i,j-1) * q(i,j-1) : 0);
+                q(i,j) = t * precon(i,j);
+            }
+        });
+        mac.iterateBackwards([&](size_t i, size_t j) {
+            if (cell(i,j) == CellType::FLUID) {
+                double t = q(i,j) - (i < SIZEX - 1? Ax(i,j) * precon(i,j) * z(i+1,j) : 0)
+                           - (j < SIZEY - 1? Ay(i,j) * precon(i,j) * z(i,j+1) : 0);
+                z(i,j) = t * precon(i,j);
+            }
+        });
+    };
+
+    // use PCG algorithm to solve the linear equation
+    r = rhs;
+    applyPreconditioner();
+    s = z;
+    double sigma = z.innerProduct(r);
+    int maxIters = 10;
+    int iter = 0;
+    while (iter < maxIters) {
+        // apply A
+        mac.iterate([&](size_t i, size_t j) {
+            z(i,j) = Adiag(i,j)*r(i,j)
+                       + (i > 0? Ax(i-1,j)*r(i-1,j) : 0)
+                       + (i < SIZEX - 1? Ax(i,j)*r(i+1,j) : 0)
+                       + (j > 0? Ay(i,j-1)*r(i,j-1) : 0)
+                       + (j < SIZEY - 1? Ay(i,j)*r(i,j+1) : 0);
+        });
+
+        double alpha = sigma / z.innerProduct(s);
+        p.setMultiplyAdd(p, alpha, s);
+        r.setMultiplyAdd(r, -alpha, z);
+        if (r.infiniteNorm() <= 1e-6) { break; }
+
+        applyPreconditioner();
+
+        double sigma_new = z.innerProduct(r);
+        double beta = sigma_new / sigma;
+        s.setMultiplyAdd(z, beta, s);
+        sigma = sigma_new;
+
+        iter++;
+    }
+
+    // update velocity using the solved pressure
+    {
+        double scale = dt / (rho * mac.dx);
+        mac.iterate([&](size_t i, size_t j) {
+            if (i > 0 && (cell(i-1,j) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
+                if (cell(i-1,j) == CellType::SOLID || cell(i,j) == CellType::SOLID)
+                    mac.u(i,j) = 0; // usolid(i,j);
+                else
+                    mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
+            }
+            else {
+                // mark as unknown?
+                mac.u(i,j) = 0;
+            }
+            if (j > 0 && (cell(i,j-1) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
+                if (cell(i,j-1) == CellType::SOLID || cell(i,j) == CellType::SOLID)
+                    mac.v(i,j) = 0;
+                else
+                    mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
+            }
+            else {
+                // mark as unknown?
+                mac.v(i,j) = 0;
+            }
+        });
+    }
+
+    gridStack.free();
 }
+

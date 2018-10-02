@@ -15,6 +15,7 @@ struct Shader {
     Symbol fragmentPath;
 
     static Shader create(const char* vertexPath, const char* fragmentPath);
+    static Shader fromStr(const char* vertexStr, const char* fragmentStr);
 
     void use();
     void setBool(const char* name, bool value);

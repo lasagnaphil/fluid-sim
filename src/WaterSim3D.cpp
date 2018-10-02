@@ -118,8 +118,6 @@ void WaterSim3D::applyProjection() {
     double scaleA = dt / (rho * mac.dx * mac.dx);
     mac.iterate([&](size_t i, size_t j, size_t k) {
         // note: if index is out of bounds, regard the cell as EMPTY
-        size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
-        // double A_diag = 0, A_plusi = 0, A_plusj = 0, A_plusk = 0;
         if (cell(i,j,k) == CellType::FLUID) {
             if (cell(i-1,j,k) == CellType::FLUID) {
                 Adiag(i,j,k) += scaleA;
@@ -160,7 +158,6 @@ void WaterSim3D::applyProjection() {
     {
         double scale = 1 / mac.dx;
         mac.iterate([&](size_t i, size_t j, size_t k) {
-            size_t idx = k * SIZEY * SIZEX + j * SIZEX + i;
             if (cell(i,j,k) == CellType::FLUID) {
                 rhs(i,j,k) = -mac.velDiv(i,j,k);
                 // modify rhs to account for solid velocities

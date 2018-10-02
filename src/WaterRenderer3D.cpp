@@ -2,11 +2,12 @@
 // Created by lasagnaphil on 2018-09-17.
 //
 
-#include <imgui.h>
+#include "WaterSim3D.h"
 #include "WaterRenderer3D.h"
+
+#include <imgui.h>
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
-#include "WaterSim3D.h"
 
 static float origCubeVertices[3*36] = {
     -0.5f, -0.5f, -0.5f,
@@ -64,7 +65,7 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
 
     memcpy(cubeVertices, origCubeVertices, sizeof(origCubeVertices));
     for (int i = 0; i < 3*36; i++) {
-        cubeVertices[i] *= CELL_SIZE;
+        cubeVertices[i] *= 0.8f * CELL_SIZE;
     }
 
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
@@ -126,14 +127,12 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * waterVoxelLocations.size, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(hmm_vec3), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glVertexAttribDivisor(1, 1);
 
     glBindVertexArray(0);
 
     lineShader.use();
     lineShader.setMatrix4("model", HMM_Mat4d(1.0));
-    voxelShader.use();
     camera->addShader(&lineShader);
     camera->addShader(&voxelShader);
 }
@@ -181,19 +180,19 @@ void WaterRenderer3D::update() {
 
 void WaterRenderer3D::draw() {
     if (drawMode == DrawMode::POINT) {
-        lineShader.use();
         glBindVertexArray(pointVAO);
+        lineShader.use();
         glDrawArrays(GL_POINTS, 0, POINT_VERTEX_COUNT);
     }
     else if (drawMode == DrawMode::LINE) {
-        lineShader.use();
         glBindVertexArray(lineVAO);
+        lineShader.use();
         glDrawArrays(GL_LINES, 0, LINE_VERTEX_COUNT);
     }
     else if (drawMode == DrawMode::VOXEL) {
-        voxelShader.use();
         glBindVertexArray(voxelVAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 36, waterVoxelLocations.size);
+        voxelShader.use();
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6*36, waterVoxelLocations.size);
     }
     glBindVertexArray(0);
 }
@@ -255,7 +254,7 @@ void WaterRenderer3D::updateWaterVoxelLocations() {
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
         WaterSim3D::CellType cellType = sim->cell(i, j, k);
         if (cellType == WaterSim3D::CellType::FLUID) {
-            waterVoxelLocations.push(HMM_Vec3(i, j, k));
+            waterVoxelLocations.push(CELL_SIZE*HMM_Vec3(i, j, k));
         }
     });
 }
