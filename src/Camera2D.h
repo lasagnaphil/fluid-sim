@@ -28,6 +28,7 @@ struct Camera2D {
     StackVec<Shader*, 4> shaders = {};
 
     float speed = 1.0f;
+    float pixelsPerMeter = 100.0f;
     float zoom = 1.0f;
 
     hmm_vec2 pos;

@@ -32,6 +32,7 @@ struct WaterSim2D {
     double rho = 1000.0;
 
     bool rendered = false;
+    int currentFrame = 0;
 
     double dt = 1.0 / 60.0;
 
@@ -46,6 +47,8 @@ struct WaterSim2D {
     void applyGravity();
 
     void applyProjection();
+
+    void updateCells();
 
     Vector2d clampPos(Vector2d pos);
 };

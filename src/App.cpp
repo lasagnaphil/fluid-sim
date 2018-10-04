@@ -139,7 +139,7 @@ void App::init(Vector2i screenSize, Mode mode) {
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
         waterRenderer2D = new WaterRenderer2D();
-        camera2d = Camera2D::create(&settings, HMM_Vec2(0.0f, 0.0f));
+        camera2d = Camera2D::create(&settings, HMM_Vec2(5.0f, 5.0f));
     }
     else if (mode == Mode::Dim3) {
         waterSim3D = new WaterSim3D();

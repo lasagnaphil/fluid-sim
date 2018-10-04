@@ -3,6 +3,7 @@
 //
 
 #include <Defer.h>
+#include <ctime>
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
@@ -32,10 +33,13 @@ void WaterSim2D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
+    updateCells();
     rendered = false;
+    currentFrame++;
 }
 
 void WaterSim2D::update() {
+    /*
     static int nextStage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
@@ -51,6 +55,8 @@ void WaterSim2D::update() {
         nextStage = (nextStage + 1) % 3;
         rendered = false;
     }
+    */
+    runFrame();
 }
 
 void WaterSim2D::applyAdvection() {
@@ -170,7 +176,6 @@ void WaterSim2D::applyProjection() {
     auto applyPreconditioner = [&]() {
         // apply preconditioner
         auto& q = gridStack.newItem();
-        defer {gridStack.pop();};
         mac.iterate([&](size_t i, size_t j) {
             if (cell(i,j) == CellType::FLUID) {
                 double t = r(i,j) - (i > 0? Ax(i-1,j) * precon(i-1,j) * q(i-1,j) : 0)
@@ -185,6 +190,7 @@ void WaterSim2D::applyProjection() {
                 z(i,j) = t * precon(i,j);
             }
         });
+        gridStack.pop();
     };
 
     // use PCG algorithm to solve the linear equation
@@ -247,5 +253,38 @@ void WaterSim2D::applyProjection() {
     }
 
     gridStack.free();
+}
+
+inline double randf() {
+    return ((double)rand()/(double)RAND_MAX) * 0.5;
+}
+
+void WaterSim2D::updateCells() {
+    srand(time(NULL));
+    Grid2D<CellType>* oldCell = new Grid2D<CellType>();
+    defer {delete oldCell;};
+    oldCell->copyFrom(cell);
+    mac.iterate([&](size_t i, size_t j) {
+        if(cell(i,j) == CellType::FLUID) {
+            cell(i,j) == CellType::EMPTY;
+        }
+    });
+    mac.iterate([&](size_t i, size_t j) {
+        if ((*oldCell)(i,j) == CellType::FLUID) {
+            Vector2d particles[4];
+            particles[0] = Vector2d::create((double)i + randf(), (double)j + randf());
+            particles[1] = Vector2d::create((double)i + 0.5 + randf(), (double)j + randf());
+            particles[2] = Vector2d::create((double)i + randf(), (double)j + 0.5 + randf());
+            particles[3] = Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf());
+            for (int l = 0; l < 4; l++) {
+                auto& pos = particles[l];
+                pos = clampPos(pos + dt * mac.velInterp(pos));
+                int x = (int)pos.x, y = (int)pos.y;
+                if (cell(x,y) == CellType::EMPTY) {
+                    cell(x,y) = CellType::FLUID;
+                }
+            }
+        }
+    });
 }
 

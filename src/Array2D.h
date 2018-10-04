@@ -12,6 +12,10 @@ template <typename T, size_t NX, size_t NY>
 struct Array2D {
     T data[NY][NX] = {};
 
+    void copyFrom(Array2D& arr) {
+        memcpy(data, arr.data, sizeof(T)*NX*NY);
+    }
+
     T& operator()(size_t i, size_t j) {
         return data[j][i];
     }

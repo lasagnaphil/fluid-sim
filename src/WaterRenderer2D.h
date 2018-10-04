@@ -34,14 +34,18 @@ private:
     static constexpr float CELL_SIZE = 10.0f / SIZEY;
     static constexpr float VEL_LINE_SCALE = 10.0f / SIZEY;
 
-    GLuint cellVAO;
+    GLuint waterCellVAO;
+    GLuint solidCellVAO;
+
     GLuint quadVBO;
     GLuint cellColorVBO;
-    GLuint cellOffsetVBO;
+    GLuint waterCellOffsetVBO;
+    GLuint solidCellOffsetVBO;
 
     hmm_vec2 cellVertices[SIZEX*SIZEY];
     hmm_vec2 quadVertices[6];
-    StackVec<hmm_vec2, SIZEX*SIZEY> waterVoxelLocations = {};
+    StackVec<hmm_vec2, SIZEX*SIZEY> waterCellLocations = {};
+    StackVec<hmm_vec2, SIZEX*SIZEY> solidCellLocations = {};
 
     Shader lineShader;
     Shader cellShader;
@@ -75,12 +79,13 @@ layout (location = 1) in vec2 inOffset;
 
 out vec4 color;
 
+uniform vec4 uniColor;
 uniform mat4 view;
 uniform mat4 proj;
 
 void main() {
     gl_Position = proj * view * vec4(inPos + inOffset, 0.0, 1.0);
-    color = vec4(0.0, 0.0, 1.0, 1.0);
+    color = uniColor;
 }
 )SHADER";
 
@@ -127,21 +132,35 @@ public:
         });
          */
 
-        updateWaterCellLocations();
+        updateCellLocations();
 
-        glGenVertexArrays(1, &cellVAO);
+        glGenVertexArrays(1, &waterCellVAO);
+        glGenVertexArrays(1, &solidCellVAO);
         glGenBuffers(1, &quadVBO);
-        glGenBuffers(1, &cellOffsetVBO);
+        glGenBuffers(1, &waterCellOffsetVBO);
+        glGenBuffers(1, &solidCellOffsetVBO);
 
-        glBindVertexArray(cellVAO);
+        glBindVertexArray(waterCellVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * 6, quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, cellOffsetVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * waterVoxelLocations.size, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * SIZEX*SIZEY, waterCellLocations.data, GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
+        glVertexAttribDivisor(1, 1);
+
+        glBindVertexArray(solidCellVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * SIZEX*SIZEY, solidCellLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
         glVertexAttribDivisor(1, 1);
@@ -154,24 +173,33 @@ public:
 
     void update() {
         if (!sim->rendered) {
-            updateWaterCellLocations();
-            glBindVertexArray(cellVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, cellOffsetVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * waterVoxelLocations.size, waterVoxelLocations.data);
+            updateCellLocations();
+            glBindVertexArray(waterCellVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * waterCellLocations.size, waterCellLocations.data);
+            glBindVertexArray(solidCellVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * solidCellLocations.size, solidCellLocations.data);
             glBindVertexArray(0);
         }
     }
 
     void draw() {
         cellShader.use();
-        glBindVertexArray(cellVAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, waterVoxelLocations.size);
+        cellShader.setVector4("uniColor", HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+        glBindVertexArray(waterCellVAO);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, waterCellLocations.size);
+        cellShader.setVector4("uniColor", HMM_Vec4(0.5f, 0.5f, 0.5f, 1.0f));
+        glBindVertexArray(solidCellVAO);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, solidCellLocations.size);
         glBindVertexArray(0);
     }
 
     void drawUI() {
         if (ENABLE_DEBUG_UI) {
-            ImGui::Begin("Simulation Data");
+            ImGui::Begin("Simulation Info");
+            ImGui::Text("Current frame: %d", sim->currentFrame);
+            /*
             if (ImGui::CollapsingHeader("Pressure")) {
                 ImGui::Columns(SIZEY, "table_p");
                 ImGui::Separator();
@@ -203,16 +231,21 @@ public:
                 ImGui::Columns(1);
                 ImGui::Separator();
             }
+             */
             ImGui::End();
         }
     }
 
-    void updateWaterCellLocations() {
-        waterVoxelLocations.size = 0;
+    void updateCellLocations() {
+        waterCellLocations.size = 0;
+        solidCellLocations.size = 0;
         sim->mac.iterate([&](size_t i, size_t j) {
             WaterSim2D::CellType cellType = sim->cell(i,j);
             if (cellType == WaterSim2D::CellType::FLUID) {
-                waterVoxelLocations.push(HMM_Vec2((float)i/CELL_SIZE,(float)j/CELL_SIZE));
+                waterCellLocations.push(HMM_Vec2((float)i*CELL_SIZE,(float)j*CELL_SIZE));
+            }
+            else if (cellType == WaterSim2D::CellType::SOLID) {
+                solidCellLocations.push(HMM_Vec2((float)i*CELL_SIZE,(float)j*CELL_SIZE));
             }
         });
     }
