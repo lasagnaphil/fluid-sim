@@ -8,7 +8,6 @@
 #include "Defer.h"
 
 void WaterSim3D::setup() {
-    mac.dx = 0.001f;
     mac.iterate([&](size_t i, size_t j, size_t k) {
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1 ||
@@ -121,7 +120,7 @@ void WaterSim3D::applyProjection() {
     auto& Az = gridStack.newItem();
 
     // calculate lhs (matrix A)
-    double scaleA = dt / (rho * mac.dx * mac.dx);
+    double scaleA = dt / (rho * dx * dx);
     mac.iterate([&](size_t i, size_t j, size_t k) {
         // note: if index is out of bounds, regard the cell as EMPTY
         if (cell(i,j,k) == CellType::FLUID) {
@@ -162,7 +161,7 @@ void WaterSim3D::applyProjection() {
 
     // calculate rhs
     {
-        double scale = 1 / mac.dx;
+        double scale = 1 / dx;
         mac.iterate([&](size_t i, size_t j, size_t k) {
             if (cell(i,j,k) == CellType::FLUID) {
                 rhs(i,j,k) = -mac.velDiv(i,j,k);
@@ -278,7 +277,7 @@ void WaterSim3D::applyProjection() {
 
     // update velocity using the solved pressure
     {
-        double scale = dt / (rho * mac.dx);
+        double scale = dt / (rho * dx);
         mac.iterate([&](size_t i, size_t j, size_t k) {
             if (i > 0 && (cell(i-1,j,k) == CellType::FLUID || cell(i,j,k) == CellType::FLUID)) {
                 if (cell(i-1,j,k) == CellType::SOLID || cell(i,j,k) == CellType::SOLID)

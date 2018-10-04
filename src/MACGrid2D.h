@@ -14,10 +14,10 @@ template <size_t NX, size_t NY>
 struct MACGrid2D {
     Array2D<double, NX + 1, NY> u;
     Array2D<double, NX, NY + 1> v;
-    double dx = 0.001;
+    double dx = 1;
 
     template <typename Fun>
-    void iterateU(Fun f) {
+    void iterateU(Fun f) const {
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX + 1; i++) {
                 f(i, j);
@@ -96,11 +96,13 @@ struct MACGrid2D {
     }
 
     double velInterpU(Vector2d pos) {
+        pos /= dx;
         pos.y -= 0.5;
         return u.triCubic(pos);
     }
 
     double velInterpV(Vector2d pos) {
+        pos /= dx;
         pos.x -= 0.5;
         return v.triCubic(pos);
     }
@@ -110,7 +112,7 @@ struct MACGrid2D {
     }
 
     double velDiv(size_t i, size_t j) {
-        return u(i+1,j)-u(i,j) + v(i,j+1)-v(i,j);
+        return (u(i+1,j)-u(i,j) + v(i,j+1)-v(i,j))/dx;
     }
 };
 

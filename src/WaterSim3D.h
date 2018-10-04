@@ -28,6 +28,7 @@ struct WaterSim3D {
     Vector3d gravity = {0, -9.8, 0};
     double rho = 1000.0;
     double dt = 0.01;
+    double dx = 0.001;
 
     bool rendered = false;
     enum Stage {

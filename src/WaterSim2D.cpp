@@ -8,6 +8,7 @@
 #include "InputManager.h"
 
 void WaterSim2D::setup() {
+    mac.dx = dx;
     mac.iterate([&](size_t i, size_t j) {
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1) {
@@ -24,8 +25,8 @@ void WaterSim2D::setup() {
 
 Vector2d WaterSim2D::clampPos(Vector2d pos) {
     Vector2d clamped = {};
-    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX);
-    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY);
+    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX * dx);
+    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY * dx);
     return clamped;
 }
 
@@ -35,7 +36,7 @@ void WaterSim2D::runFrame() {
     applyProjection();
     updateCells();
     rendered = false;
-    currentFrame++;
+    currentTime += dt;
 }
 
 void WaterSim2D::update() {
@@ -52,23 +53,26 @@ void WaterSim2D::update() {
         else if (nextStage == 2) {
             applyProjection();
         }
-        nextStage = (nextStage + 1) % 3;
+        else if (nextStage == 3) {
+            updateCells();
+        }
+        nextStage = (nextStage + 1) % 4;
         rendered = false;
     }
-    */
+     */
     runFrame();
 }
 
 void WaterSim2D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j) {
-        Vector2d u_pos = Vector2d::create((double)i, (double)j + 0.5);
+        Vector2d u_pos = Vector2d::create((double)i, ((double)j + 0.5)) * dx;
         Vector2d x_mid = u_pos - 0.5 * dt * mac.velU(i, j);
         Vector2d x_mid_cl = clampPos(x_mid);
         Vector2d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
         mac.u(i,j) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j) {
-        Vector2d v_pos = Vector2d::create((double)i + 0.5, (double)j);
+        Vector2d v_pos = Vector2d::create(((double)i + 0.5), (double)j) * dx;
         Vector2d x_mid = v_pos - 0.5 * dt * mac.velV(i, j);
         Vector2d x_mid_cl = clampPos(x_mid);
         Vector2d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
@@ -93,7 +97,7 @@ void WaterSim2D::applyProjection() {
     auto& Ay = gridStack.newItem();
 
     // calculate lhs (matrix A)
-    double scaleA = dt / (rho * mac.dx * mac.dx);
+    double scaleA = dt / (rho * dx * dx);
     mac.iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
             if (cell(i-1,j) == CellType::FLUID) {
@@ -123,10 +127,10 @@ void WaterSim2D::applyProjection() {
 
     // calculate rhs
     {
-        double scale = 1 / mac.dx;
+        double scale = 1.0 / dx;
         mac.iterate([&](size_t i, size_t j) {
             if (cell(i,j) == CellType::FLUID) {
-                rhs(i,j) = -mac.velDiv(i,j);
+                rhs(i,j) = -scale * (mac.u(i+1,j)-mac.u(i,j)+mac.v(i,j+1)-mac.v(i,j));
                 // modify rhs to account for solid velocities
                 // TODO: use usolid, vsolid, wsolid instead of 0
                 if (cell(i-1,j) == CellType::SOLID) {
@@ -142,7 +146,6 @@ void WaterSim2D::applyProjection() {
                     rhs(i,j) += scale * (mac.v(i,j+1) - 0);
                 }
             }
-
         });
     }
 
@@ -198,16 +201,18 @@ void WaterSim2D::applyProjection() {
     applyPreconditioner();
     s = z;
     double sigma = z.innerProduct(r);
-    int maxIters = 10;
+    int maxIters = 200;
     int iter = 0;
     while (iter < maxIters) {
         // apply A
         mac.iterate([&](size_t i, size_t j) {
-            z(i,j) = Adiag(i,j)*r(i,j)
-                       + (i > 0? Ax(i-1,j)*r(i-1,j) : 0)
-                       + (i < SIZEX - 1? Ax(i,j)*r(i+1,j) : 0)
-                       + (j > 0? Ay(i,j-1)*r(i,j-1) : 0)
-                       + (j < SIZEY - 1? Ay(i,j)*r(i,j+1) : 0);
+            if (cell(i,j) == CellType::FLUID) {
+                z(i, j) = Adiag(i, j) * s(i, j)
+                          + (i > 0 ? Ax(i - 1, j) * s(i - 1, j) : 0)
+                          + (i < SIZEX - 1 ? Ax(i, j) * s(i + 1, j) : 0)
+                          + (j > 0 ? Ay(i, j - 1) * s(i, j - 1) : 0)
+                          + (j < SIZEY - 1 ? Ay(i, j) * s(i, j + 1) : 0);
+            }
         });
 
         double alpha = sigma / z.innerProduct(s);
@@ -227,7 +232,7 @@ void WaterSim2D::applyProjection() {
 
     // update velocity using the solved pressure
     {
-        double scale = dt / (rho * mac.dx);
+        double scale = dt / (rho * dx);
         mac.iterate([&](size_t i, size_t j) {
             if (i > 0 && (cell(i-1,j) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
                 if (cell(i-1,j) == CellType::SOLID || cell(i,j) == CellType::SOLID)
@@ -237,7 +242,7 @@ void WaterSim2D::applyProjection() {
             }
             else {
                 // mark as unknown?
-                mac.u(i,j) = 0;
+                // mac.u(i,j) = 0;
             }
             if (j > 0 && (cell(i,j-1) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
                 if (cell(i,j-1) == CellType::SOLID || cell(i,j) == CellType::SOLID)
@@ -247,7 +252,7 @@ void WaterSim2D::applyProjection() {
             }
             else {
                 // mark as unknown?
-                mac.v(i,j) = 0;
+                // mac.v(i,j) = 0;
             }
         });
     }
@@ -266,25 +271,52 @@ void WaterSim2D::updateCells() {
     oldCell->copyFrom(cell);
     mac.iterate([&](size_t i, size_t j) {
         if(cell(i,j) == CellType::FLUID) {
-            cell(i,j) == CellType::EMPTY;
+            cell(i,j) = CellType::EMPTY;
         }
     });
     mac.iterate([&](size_t i, size_t j) {
         if ((*oldCell)(i,j) == CellType::FLUID) {
             Vector2d particles[4];
-            particles[0] = Vector2d::create((double)i + randf(), (double)j + randf());
-            particles[1] = Vector2d::create((double)i + 0.5 + randf(), (double)j + randf());
-            particles[2] = Vector2d::create((double)i + randf(), (double)j + 0.5 + randf());
-            particles[3] = Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf());
+            particles[0] = Vector2d::create((double)i + randf(), (double)j + randf()) * dx;
+            particles[1] = Vector2d::create((double)i + 0.5 + randf(), (double)j + randf()) * dx;
+            particles[2] = Vector2d::create((double)i + randf(), (double)j + 0.5 + randf()) * dx;
+            particles[3] = Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx;
             for (int l = 0; l < 4; l++) {
-                auto& pos = particles[l];
-                pos = clampPos(pos + dt * mac.velInterp(pos));
-                int x = (int)pos.x, y = (int)pos.y;
+                // Advection using RK4
+                auto pos = particles[l];
+                auto k1 = mac.velInterp(pos);
+                auto k2 = mac.velInterp(pos + 0.5*dt*k1);
+                auto k3 = mac.velInterp(pos + 0.75*dt*k2);
+                auto newPos = pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
+                newPos = clampPos(newPos);
+                int x = (int)(newPos.x/dx), y = (int)(newPos.y/dx);
                 if (cell(x,y) == CellType::EMPTY) {
                     cell(x,y) = CellType::FLUID;
                 }
             }
         }
     });
+}
+
+double WaterSim2D::avgPressure() {
+    double avgP = 0.0f;
+    mac.iterate([&](size_t i, size_t j) {
+        avgP += p(i,j);
+    });
+    avgP /= (SIZEX*SIZEY);
+    return avgP;
+}
+
+double WaterSim2D::avgPressureInFluid() {
+    double avgP = 0.0f;
+    size_t count = 0;
+    mac.iterate([&](size_t i, size_t j) {
+        if (cell(i,j) == CellType::FLUID) {
+            avgP += p(i,j);
+            count++;
+        }
+    });
+    avgP /= count;
+    return avgP;
 }
 

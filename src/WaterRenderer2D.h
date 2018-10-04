@@ -198,7 +198,9 @@ public:
     void drawUI() {
         if (ENABLE_DEBUG_UI) {
             ImGui::Begin("Simulation Info");
-            ImGui::Text("Current frame: %d", sim->currentFrame);
+            ImGui::Text("Current frame: %f", sim->currentTime);
+            ImGui::Text("Average pressure: %f", sim->avgPressure());
+            ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
             /*
             if (ImGui::CollapsingHeader("Pressure")) {
                 ImGui::Columns(SIZEY, "table_p");

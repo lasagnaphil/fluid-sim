@@ -29,12 +29,13 @@ struct WaterSim2D {
     Array2D<CellType, SIZEX, SIZEY> cell = {};
 
     Vector2d gravity = {0, -9.8};
-    double rho = 1000.0;
+    double rho = 997.0;
 
     bool rendered = false;
-    int currentFrame = 0;
+    double currentTime = 0.0f;
 
-    double dt = 1.0 / 60.0;
+    double dt = 0.005;
+    double dx = 0.001;
 
     void setup();
 
@@ -51,6 +52,9 @@ struct WaterSim2D {
     void updateCells();
 
     Vector2d clampPos(Vector2d pos);
+
+    double avgPressure();
+    double avgPressureInFluid();
 };
 
 

@@ -15,7 +15,6 @@ struct MACGrid3D {
     Array3D<double, SIZEX + 1, SIZEY, SIZEZ> u = {};
     Array3D<double, SIZEX, SIZEY + 1, SIZEZ> v = {};
     Array3D<double, SIZEX, SIZEY, SIZEZ + 1> w = {};
-    double dx = 0.001;
 
     template <typename Fun>
     void iterateU(Fun f) {
@@ -152,7 +151,7 @@ struct MACGrid3D {
     }
 
     double velDiv(size_t i, size_t j, size_t k) {
-        return (u(i+1,j,k) - u(i,j,k) + v(i,j+1,k) - v(i,j,k) + w(i,j,k+1) - w(i,j,k)) / dx;
+        return (u(i+1,j,k) - u(i,j,k) + v(i,j+1,k) - v(i,j,k) + w(i,j,k+1) - w(i,j,k));
     }
 };
 
