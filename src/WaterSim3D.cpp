@@ -7,13 +7,14 @@
 #include "Defer.h"
 
 void WaterSim3D::setup() {
+    mac.dx = 0.001f;
     mac.iterate([&](size_t i, size_t j, size_t k) {
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1 ||
             k == 0 || k == SIZEZ - 1) {
             cell(i, j, k) = CellType::SOLID;
         }
-        else if (i + j < SIZEY * 3 / 4) {
+        else if ((double)i + j < SIZEY * 3 / 4) {
             cell(i, j, k) = CellType::FLUID;
         }
         else {
@@ -34,6 +35,7 @@ void WaterSim3D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
+    updateCells();
     rendered = false;
 }
 
@@ -41,6 +43,7 @@ void WaterSim3D::update() {
     static int nextStage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
+        /*
         if (nextStage == 0) {
             applyAdvection();
             stage = Stage::ADVECTION;
@@ -55,6 +58,8 @@ void WaterSim3D::update() {
         }
         nextStage = (nextStage + 1) % 3;
         rendered = false;
+         */
+        runFrame();
     }
 }
 
@@ -72,21 +77,21 @@ void WaterSim3D::debugPrint() {
 
 void WaterSim3D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
-        Vector3d u_pos = Vector3d::create(i, (double)j + 0.5, (double)k + 0.5);
+        Vector3d u_pos = Vector3d::create(i, (double)(double)j + 0.5, (double)(double)k + 0.5);
         Vector3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
         mac.u(i,j,k) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j, size_t k) {
-        Vector3d v_pos = Vector3d::create((double)i + 0.5, j, (double)k + 0.5);
+        Vector3d v_pos = Vector3d::create((double)(double)i + 0.5, j, (double)(double)k + 0.5);
         Vector3d x_mid = v_pos - 0.5 * dt * mac.velV(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
         mac.v(i,j,k) = mac.velInterpV(x_p);
     });
     mac.iterateW([&](size_t i, size_t j, size_t k) {
-        Vector3d w_pos = Vector3d::create((double)i + 0.5, (double)j + 0.5, k);
+        Vector3d w_pos = Vector3d::create((double)(double)i + 0.5, (double)(double)j + 0.5, k);
         Vector3d x_mid = w_pos - 0.5 * dt * mac.velW(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = w_pos - dt * mac.velInterp(x_mid_cl);
@@ -308,4 +313,39 @@ void WaterSim3D::applyProjection() {
     }
 
     gridStack.free();
+}
+
+inline double randf() {
+    return (double)rand()/(double)(RAND_MAX/0.5);
+}
+
+void WaterSim3D::updateCells() {
+    srand(time(NULL));
+    Grid3D<CellType> oldCell = cell;
+    mac.iterate([&](size_t i, size_t j, size_t k) {
+        if (cell(i,j,k) == CellType::FLUID) {
+            cell(i,j,k) = CellType::EMPTY;
+        }
+    });
+    mac.iterate([&](size_t i, size_t j, size_t k) {
+        if (oldCell(i,j,k) == CellType::FLUID) {
+            Vector3d particles[8];
+            particles[0] = Vector3d::create((double)i + randf(), (double)j + randf(), (double)k + randf());
+            particles[1] = Vector3d::create((double)i + 0.5 + randf(), (double)j + randf(), (double)k + randf());
+            particles[2] = Vector3d::create((double)i + randf(), (double)j + 0.5 + randf(), (double)k + randf());
+            particles[3] = Vector3d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + randf());
+            particles[4] = Vector3d::create((double)i + randf(), (double)j + randf(), (double)k + 0.5 + randf());
+            particles[5] = Vector3d::create((double)i + 0.5 + randf(), (double)j + randf(), (double)k + 0.5 + randf());
+            particles[6] = Vector3d::create((double)i + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
+            particles[7] = Vector3d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
+            for (int l = 0; l < 8; l++) {
+                auto& pos = particles[l];
+                pos = clampPos(pos + dt * mac.velInterp(pos));
+                int x = (int)pos.x, y = (int)pos.y, z = (int)pos.z;
+                if (cell(x,y,z) == CellType::EMPTY) {
+                    cell(x,y,z) = CellType::FLUID;
+                }
+            }
+        }
+    });
 }

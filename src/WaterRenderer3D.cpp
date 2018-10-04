@@ -124,7 +124,7 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, cellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * waterVoxelLocations.size, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * SIZEX*SIZEY*SIZEZ, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(hmm_vec3), 0);
     glVertexAttribDivisor(1, 1);

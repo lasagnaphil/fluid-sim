@@ -27,7 +27,7 @@ struct WaterSim3D {
 
     Vector3d gravity = {0, -9.8, 0};
     double rho = 1000.0;
-    double dt = 1.0 / 60.0;
+    double dt = 0.01;
 
     bool rendered = false;
     enum Stage {
@@ -48,6 +48,8 @@ struct WaterSim3D {
     void applyGravity();
 
     void applyProjection();
+
+    void updateCells();
 
     Vector3d clampPos(const Vector3d& x);
 };

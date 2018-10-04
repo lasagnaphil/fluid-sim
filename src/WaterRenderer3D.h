@@ -27,7 +27,7 @@ class WaterRenderer3D {
     };
     DrawMode drawMode = DrawMode::POINT;
     static constexpr float CELL_SIZE = 1.0f / SIZEY;
-    static constexpr float VEL_LINE_SCALE = 1.0f / SIZEY;
+    static constexpr float VEL_LINE_SCALE = 0.001f / SIZEY;
     static constexpr size_t POINT_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ;
     static constexpr size_t LINE_VERTEX_COUNT = SIZEX * SIZEY * SIZEZ * 2;
 
