@@ -1,6 +1,7 @@
 //
 // Created by lasagnaphil on 9/13/18.
 //
+#include <time.h>
 #include "WaterSim3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
@@ -77,21 +78,21 @@ void WaterSim3D::debugPrint() {
 
 void WaterSim3D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
-        Vector3d u_pos = Vector3d::create(i, (double)(double)j + 0.5, (double)(double)k + 0.5);
+        Vector3d u_pos = Vector3d::create(i, (double)j + 0.5, (double)k + 0.5);
         Vector3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
         mac.u(i,j,k) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j, size_t k) {
-        Vector3d v_pos = Vector3d::create((double)(double)i + 0.5, j, (double)(double)k + 0.5);
+        Vector3d v_pos = Vector3d::create((double)i + 0.5, j, (double)k + 0.5);
         Vector3d x_mid = v_pos - 0.5 * dt * mac.velV(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
         mac.v(i,j,k) = mac.velInterpV(x_p);
     });
     mac.iterateW([&](size_t i, size_t j, size_t k) {
-        Vector3d w_pos = Vector3d::create((double)(double)i + 0.5, (double)(double)j + 0.5, k);
+        Vector3d w_pos = Vector3d::create((double)i + 0.5, (double)j + 0.5, k);
         Vector3d x_mid = w_pos - 0.5 * dt * mac.velW(i, j, k);
         Vector3d x_mid_cl = clampPos(x_mid);
         Vector3d x_p = w_pos - dt * mac.velInterp(x_mid_cl);
@@ -222,7 +223,6 @@ void WaterSim3D::applyProjection() {
     auto applyPreconditioner = [&]() {
         // apply preconditioner
         auto& q = gridStack.newItem();
-        defer {gridStack.pop();};
         mac.iterate([&](size_t i, size_t j, size_t k) {
             if (cell(i,j,k) == CellType::FLUID) {
                 double t = r(i,j,k) - (i > 0? Ax(i-1,j,k) * precon(i-1,j,k) * q(i-1,j,k) : 0)
@@ -239,6 +239,7 @@ void WaterSim3D::applyProjection() {
                 z(i,j,k) = t * precon(i,j,k);
             }
         });
+        gridStack.pop();
     };
 
     // use PCG algorithm to solve the linear equation
@@ -316,19 +317,21 @@ void WaterSim3D::applyProjection() {
 }
 
 inline double randf() {
-    return (double)rand()/(double)(RAND_MAX/0.5);
+    return ((double)rand()/(double)RAND_MAX) * 0.5;
 }
 
 void WaterSim3D::updateCells() {
     srand(time(NULL));
-    Grid3D<CellType> oldCell = cell;
+    Grid3D<CellType>* oldCell = new Grid3D<CellType>();
+    defer {delete oldCell;};
+    oldCell->copyFrom(cell);
     mac.iterate([&](size_t i, size_t j, size_t k) {
         if (cell(i,j,k) == CellType::FLUID) {
             cell(i,j,k) = CellType::EMPTY;
         }
     });
     mac.iterate([&](size_t i, size_t j, size_t k) {
-        if (oldCell(i,j,k) == CellType::FLUID) {
+        if ((*oldCell)(i,j,k) == CellType::FLUID) {
             Vector3d particles[8];
             particles[0] = Vector3d::create((double)i + randf(), (double)j + randf(), (double)k + randf());
             particles[1] = Vector3d::create((double)i + 0.5 + randf(), (double)j + randf(), (double)k + randf());

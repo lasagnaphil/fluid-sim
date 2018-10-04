@@ -6,12 +6,19 @@
 #define FLUID_SIM_ARRAY3D_H
 
 #include <cstddef>
+#include <cassert>
 #include <cmath>
+#include <cstdio>
 #include <math/Vector3.h>
 
 template <typename T, size_t NX, size_t NY, size_t NZ>
 struct Array3D {
     T data[NZ][NY][NX] = {};
+
+    void copyFrom(const Array3D& arr) {
+        memcpy(data, arr.data, sizeof(T)*NX*NY*NZ);
+    }
+
     T& operator()(size_t i, size_t j, size_t k) {
         return data[k][j][i];
     }
@@ -62,7 +69,8 @@ struct Array3D {
             return (0);
 
         T dx = p.x - (T) x, dy = p.y - (T) y, dz = p.z - (T) z;
-        T* pv = (T*)data + (x - 1) + (y - 1) * NX + (z - 1) * NX * NY;
+        T* grid = (T*)data;
+        size_t idx = (x - 1) + (y - 1) * NX + (z - 1) * NX * NY;
 
     #define CUBE(x)   ((x) * (x) * (x))
     #define SQR(x)    ((x) * (x))
@@ -89,20 +97,20 @@ struct Array3D {
 
         for (int k = 0; k < 4; k++)
         {
+            size_t zp = z+k-1 < NZ? z+k-1 : NZ-1;
             q[k] = 0;
             for (int j = 0; j < 4; j++)
             {
+                size_t yp = y+j-1 < NY? y+j-1 : NY-1;
                 r[j] = 0;
                 for (int i = 0; i < 4; i++)
                 {
-                    r[j] += u[i] * *pv;
-                    pv++;
+                    size_t xp = x+i-1 < NX? x+i-1 : NX-1;
+                    r[j] += u[i] * data[zp][yp][xp];
                 }
                 q[k] += v[j] * r[j];
-                pv += NX - 4;
             }
             vox += w[k] * q[k];
-            pv += NX * NY - 4 * NX;
         }
         return (T)(vox < 0 ? 0.0 : vox);
 
