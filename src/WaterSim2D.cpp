@@ -65,17 +65,47 @@ void WaterSim2D::update() {
 
 void WaterSim2D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j) {
-        Vector2d u_pos = Vector2d::create((double)i, ((double)j + 0.5)) * dx;
-        Vector2d x_mid = u_pos - 0.5 * dt * mac.velU(i, j);
-        Vector2d x_mid_cl = clampPos(x_mid);
-        Vector2d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
+        Vector2d x_p = Vector2d::create((double)i, ((double)j + 0.5)) * dx;
+        double tau = 0;
+        bool finished = false;
+        double C = 4;
+        while (!finished) {
+            auto k1 = mac.velInterp(x_p);
+            double dtau = C * dx / (k1.normalize() + 10e-37);
+            if (tau + dtau >= dt) {
+                dtau = dt - tau;
+                finished = true;
+            }
+            else if (tau + 2 * dtau >= dt) {
+                dtau = 0.5 * (dt - tau);
+            }
+            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+            tau += dtau;
+        }
         mac.u(i,j) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j) {
-        Vector2d v_pos = Vector2d::create(((double)i + 0.5), (double)j) * dx;
-        Vector2d x_mid = v_pos - 0.5 * dt * mac.velV(i, j);
-        Vector2d x_mid_cl = clampPos(x_mid);
-        Vector2d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
+        Vector2d x_p = Vector2d::create((double)i + 0.5, ((double)j)) * dx;
+        double tau = 0;
+        bool finished = false;
+        double C = 4;
+        while (!finished) {
+            auto k1 = mac.velInterp(x_p);
+            double dtau = C * dx / (k1.normalize() + 10e-37);
+            if (tau + dtau >= dt) {
+                dtau = dt - tau;
+                finished = true;
+            }
+            else if (tau + 2 * dtau >= dt) {
+                dtau = 0.5 * (dt - tau);
+            }
+            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+            tau += dtau;
+        }
         mac.v(i,j) = mac.velInterpV(x_p);
     });
 }

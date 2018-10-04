@@ -14,8 +14,8 @@ struct WaterSimSettings {
     };
 
     struct Dim2D {
-        static constexpr int SIZEX = 256;
-        static constexpr int SIZEY = 256;
+        static constexpr int SIZEX = 128;
+        static constexpr int SIZEY = 128;
         static constexpr bool ENABLE_DEBUG_UI = true;
     };
 };
