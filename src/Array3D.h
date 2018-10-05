@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <math/Vector3.h>
+#include <math/Utils.h>
 
 template <typename T, size_t NX, size_t NY, size_t NZ>
 struct Array3D {
@@ -69,8 +70,6 @@ struct Array3D {
             return (0);
 
         T dx = p.x - (T) x, dy = p.y - (T) y, dz = p.z - (T) z;
-        T* grid = (T*)data;
-        size_t idx = (x - 1) + (y - 1) * NX + (z - 1) * NX * NY;
 
     #define CUBE(x)   ((x) * (x) * (x))
     #define SQR(x)    ((x) * (x))
@@ -97,15 +96,15 @@ struct Array3D {
 
         for (int k = 0; k < 4; k++)
         {
-            size_t zp = z+k-1 < NZ? z+k-1 : NZ-1;
+            int zp = utils::clamp<int>(z+k-1, 0, NZ-1);
             q[k] = 0;
             for (int j = 0; j < 4; j++)
             {
-                size_t yp = y+j-1 < NY? y+j-1 : NY-1;
+                int yp = utils::clamp<int>(y+j-1, 0, NY-1);
                 r[j] = 0;
                 for (int i = 0; i < 4; i++)
                 {
-                    size_t xp = x+i-1 < NX? x+i-1 : NX-1;
+                    int xp = utils::clamp<int>(x+i-1, 0, NX-1);
                     r[j] += u[i] * data[zp][yp][xp];
                 }
                 q[k] += v[j] * r[j];

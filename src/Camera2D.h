@@ -12,6 +12,7 @@ struct AppSettings;
 struct Shader;
 
 struct Camera2D {
+    static Camera2D create(AppSettings* settings);
     static Camera2D create(AppSettings* settings, hmm_vec2 pos);
 
     void addShader(Shader* shader);
@@ -27,7 +28,7 @@ struct Camera2D {
     AppSettings* settings;
     StackVec<Shader*, 4> shaders = {};
 
-    float speed = 1.0f;
+    float speed = 5.0f;
     float pixelsPerMeter = 100.0f;
     float zoom = 1.0f;
 

@@ -7,8 +7,13 @@
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
+inline double randf() {
+    return ((double)rand()/(double)RAND_MAX) * 0.5;
+}
+
 void WaterSim2D::setup() {
     mac.dx = dx;
+    size_t fluidCount = 0;
     mac.iterate([&](size_t i, size_t j) {
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1) {
@@ -16,17 +21,27 @@ void WaterSim2D::setup() {
         }
         else if (i + j < SIZEY * 3 / 4) {
             cell(i, j) = CellType::FLUID;
+            fluidCount++;
         }
         else {
             cell(i, j) = CellType::EMPTY;
+        }
+    });
+    particles.reserve(fluidCount);
+    mac.iterate([&](size_t i, size_t j) {
+        if (cell(i,j) == CellType::FLUID) {
+            particles.push(Vector2d::create((double)i + randf(), (double)j + randf()) * dx);
+            particles.push(Vector2d::create((double)i + 0.5 + randf(), (double)j + randf()) * dx);
+            particles.push(Vector2d::create((double)i + randf(), (double)j + 0.5 + randf()) * dx);
+            particles.push(Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx);
         }
     });
 }
 
 Vector2d WaterSim2D::clampPos(Vector2d pos) {
     Vector2d clamped = {};
-    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX * dx);
-    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY * dx);
+    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX * dx - 1e-10);
+    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY * dx - 1e-10);
     return clamped;
 }
 
@@ -64,11 +79,11 @@ void WaterSim2D::update() {
 }
 
 void WaterSim2D::applyAdvection() {
+    double C = 5;
     mac.iterateU([&](size_t i, size_t j) {
         Vector2d x_p = Vector2d::create((double)i, ((double)j + 0.5)) * dx;
         double tau = 0;
         bool finished = false;
-        double C = 4;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
             double dtau = C * dx / (k1.normalize() + 10e-37);
@@ -90,7 +105,6 @@ void WaterSim2D::applyAdvection() {
         Vector2d x_p = Vector2d::create((double)i + 0.5, ((double)j)) * dx;
         double tau = 0;
         bool finished = false;
-        double C = 4;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
             double dtau = C * dx / (k1.normalize() + 10e-37);
@@ -111,11 +125,8 @@ void WaterSim2D::applyAdvection() {
 }
 
 void WaterSim2D::applyGravity() {
-    mac.iterateU([&](size_t i, size_t j) {
-        mac.u(i,j) += dt * gravity.x;
-    });
     mac.iterateV([&](size_t i, size_t j) {
-        mac.v(i,j) += dt * gravity.y;
+        mac.v(i,j) += dt * gravity;
     });
 }
 
@@ -290,10 +301,6 @@ void WaterSim2D::applyProjection() {
     gridStack.free();
 }
 
-inline double randf() {
-    return ((double)rand()/(double)RAND_MAX) * 0.5;
-}
-
 void WaterSim2D::updateCells() {
     srand(time(NULL));
     Grid2D<CellType>* oldCell = new Grid2D<CellType>();
@@ -304,26 +311,21 @@ void WaterSim2D::updateCells() {
             cell(i,j) = CellType::EMPTY;
         }
     });
+    for (int i = 0; i < particles.size; i++) {
+        auto& pos = particles[i];
+        auto k1 = mac.velInterp(pos);
+        auto k2 = mac.velInterp(pos + 0.5*dt*k1);
+        auto k3 = mac.velInterp(pos + 0.75*dt*k2);
+        pos = clampPos(pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3);
+        int x = (int)(pos.x/dx), y = (int)(pos.y/dx);
+        if (cell(x,y) == CellType::EMPTY) {
+            cell(x,y) = CellType::FLUID;
+        }
+    }
+    // set pressure of empty cells to zero
     mac.iterate([&](size_t i, size_t j) {
-        if ((*oldCell)(i,j) == CellType::FLUID) {
-            Vector2d particles[4];
-            particles[0] = Vector2d::create((double)i + randf(), (double)j + randf()) * dx;
-            particles[1] = Vector2d::create((double)i + 0.5 + randf(), (double)j + randf()) * dx;
-            particles[2] = Vector2d::create((double)i + randf(), (double)j + 0.5 + randf()) * dx;
-            particles[3] = Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx;
-            for (int l = 0; l < 4; l++) {
-                // Advection using RK4
-                auto pos = particles[l];
-                auto k1 = mac.velInterp(pos);
-                auto k2 = mac.velInterp(pos + 0.5*dt*k1);
-                auto k3 = mac.velInterp(pos + 0.75*dt*k2);
-                auto newPos = pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
-                newPos = clampPos(newPos);
-                int x = (int)(newPos.x/dx), y = (int)(newPos.y/dx);
-                if (cell(x,y) == CellType::EMPTY) {
-                    cell(x,y) = CellType::FLUID;
-                }
-            }
+        if (cell(i,j) == CellType::EMPTY) {
+            p(i,j) = 0;
         }
     });
 }
@@ -348,5 +350,9 @@ double WaterSim2D::avgPressureInFluid() {
     });
     avgP /= count;
     return avgP;
+}
+
+hmm_vec2 WaterSim2D::getGridCenter() {
+    return HMM_Vec2(SIZEX * dx / 2, SIZEY * dx / 2);
 }
 

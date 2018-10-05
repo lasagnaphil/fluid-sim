@@ -17,12 +17,12 @@
 #include "Camera2D.h"
 
 static hmm_vec2 origQuadVertices[6] = {
-        HMM_Vec2(-0.5f, -0.5f),
-        HMM_Vec2(-0.5f, 0.5f),
-        HMM_Vec2(0.5f, 0.5f),
-        HMM_Vec2(-0.5f, -0.5f),
-        HMM_Vec2(0.5f, 0.5f),
-        HMM_Vec2(0.5f, -0.5f)
+        HMM_Vec2(0.0f, 0.0f),
+        HMM_Vec2(0.0f, 1.0f),
+        HMM_Vec2(1.0f, 1.0f),
+        HMM_Vec2(0.0f, 0.0f),
+        HMM_Vec2(1.0f, 1.0f),
+        HMM_Vec2(1.0f, 0.0f),
 };
 
 class WaterRenderer2D {
@@ -31,33 +31,33 @@ private:
     static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
     static constexpr int ENABLE_DEBUG_UI = WaterSimSettings::Dim2D::ENABLE_DEBUG_UI;
 
-    static constexpr float CELL_SIZE = 10.0f / SIZEY;
+    static constexpr float CELL_SIZE = 1.0f / SIZEY;
     static constexpr float VEL_LINE_SCALE = 10.0f / SIZEY;
 
     GLuint waterCellVAO;
     GLuint solidCellVAO;
+    GLuint particleVAO;
 
     GLuint quadVBO;
-    GLuint cellColorVBO;
     GLuint waterCellOffsetVBO;
     GLuint solidCellOffsetVBO;
+    GLuint particleVBO;
 
     hmm_vec2 cellVertices[SIZEX*SIZEY];
     hmm_vec2 quadVertices[6];
     StackVec<hmm_vec2, SIZEX*SIZEY> waterCellLocations = {};
     StackVec<hmm_vec2, SIZEX*SIZEY> solidCellLocations = {};
+    StackVec<hmm_vec2, 4*SIZEX*SIZEY> particleLocations = {};
 
-    Shader lineShader;
     Shader cellShader;
+    Shader particleShader;
 
     WaterSim2D* sim;
 
-
-    const char* lineVS = R"SHADER(
+    const char* particleVS = R"SHADER(
 #version 330 core
 
 layout (location = 0) in vec2 inPos;
-layout (location = 1) in vec4 inColor;
 
 out vec4 color;
 
@@ -65,8 +65,8 @@ uniform mat4 view;
 uniform mat4 proj;
 
 void main() {
-    gl_Position = proj * view * vec4(inPos, 0.0, 1.0);
-    color = inColor;
+    gl_Position = proj * view * vec4(inPos, 0.1, 1.0);
+    color = vec4(1.0, 1.0, 1.0, 1.0);
 }
 
 )SHADER";
@@ -111,34 +111,22 @@ public:
         const auto SOLID_COLOR = HMM_Vec4(0.1f, 0.1f, 0.1f, 1.0f);
 
         cellShader = Shader::fromStr(cellVS, cellFS);
+        particleShader = Shader::fromStr(particleVS, cellFS);
 
         memcpy(quadVertices, origQuadVertices, sizeof(origQuadVertices));
         for (int i = 0; i < 6*36; i++) {
-            quadVertices[i] *= CELL_SIZE;
+            quadVertices[i] *= sim->dx;
         }
 
-        /*
-        sim->mac.iterate([&](size_t i, size_t j) {
-            WaterSim2D::CellType cellType = sim->cell(i, j);
-            if (cellType == WaterSim2D::CellType::EMPTY) {
-                cellColors[j * SIZEX + i] = EMPTY_COLOR;
-            }
-            else if (cellType == WaterSim2D::CellType::FLUID) {
-                cellColors[j * SIZEX + i] = FLUID_COLOR;
-            }
-            else if (cellType == WaterSim2D::CellType::SOLID) {
-                cellColors[j * SIZEX + i] = SOLID_COLOR;
-            }
-        });
-         */
-
-        updateCellLocations();
+        updateLocations();
 
         glGenVertexArrays(1, &waterCellVAO);
         glGenVertexArrays(1, &solidCellVAO);
+        glGenVertexArrays(1, &particleVAO);
         glGenBuffers(1, &quadVBO);
         glGenBuffers(1, &waterCellOffsetVBO);
         glGenBuffers(1, &solidCellOffsetVBO);
+        glGenBuffers(1, &particleVBO);
 
         glBindVertexArray(waterCellVAO);
 
@@ -165,21 +153,31 @@ public:
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
         glVertexAttribDivisor(1, 1);
 
+        glBindVertexArray(particleVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * 4*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
+
         glBindVertexArray(0);
 
-        cellShader.use();
         camera->addShader(&cellShader);
+        camera->addShader(&particleShader);
     }
 
     void update() {
         if (!sim->rendered) {
-            updateCellLocations();
+            updateLocations();
             glBindVertexArray(waterCellVAO);
             glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * waterCellLocations.size, waterCellLocations.data);
             glBindVertexArray(solidCellVAO);
             glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * solidCellLocations.size, solidCellLocations.data);
+            glBindVertexArray(particleVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * particleLocations.size, particleLocations.data);
             glBindVertexArray(0);
         }
     }
@@ -192,6 +190,9 @@ public:
         cellShader.setVector4("uniColor", HMM_Vec4(0.5f, 0.5f, 0.5f, 1.0f));
         glBindVertexArray(solidCellVAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, solidCellLocations.size);
+        particleShader.use();
+        glBindVertexArray(particleVAO);
+        glDrawArrays(GL_POINTS, 0, particleLocations.size);
         glBindVertexArray(0);
     }
 
@@ -238,18 +239,23 @@ public:
         }
     }
 
-    void updateCellLocations() {
+    void updateLocations() {
         waterCellLocations.size = 0;
         solidCellLocations.size = 0;
         sim->mac.iterate([&](size_t i, size_t j) {
             WaterSim2D::CellType cellType = sim->cell(i,j);
             if (cellType == WaterSim2D::CellType::FLUID) {
-                waterCellLocations.push(HMM_Vec2((float)i*CELL_SIZE,(float)j*CELL_SIZE));
+                waterCellLocations.push(HMM_Vec2((float)i,(float)j) * sim->dx);
             }
             else if (cellType == WaterSim2D::CellType::SOLID) {
-                solidCellLocations.push(HMM_Vec2((float)i*CELL_SIZE,(float)j*CELL_SIZE));
+                solidCellLocations.push(HMM_Vec2((float)i,(float)j) * sim->dx);
             }
         });
+        particleLocations.size = sim->particles.size;
+        for (size_t i = 0; i < sim->particles.size; i++) {
+            particleLocations[i].X = (float)sim->particles[i].x;
+            particleLocations[i].Y = (float)sim->particles[i].y;
+        }
     }
 };
 

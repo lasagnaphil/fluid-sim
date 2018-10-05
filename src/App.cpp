@@ -139,7 +139,8 @@ void App::init(Vector2i screenSize, Mode mode) {
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
         waterRenderer2D = new WaterRenderer2D();
-        camera2d = Camera2D::create(&settings, HMM_Vec2(5.0f, 5.0f));
+        camera2d = Camera2D::create(&settings, waterSim2D->getGridCenter());
+        camera2d.zoom = 64.0f;
     }
     else if (mode == Mode::Dim3) {
         waterSim3D = new WaterSim3D();
@@ -230,11 +231,9 @@ void App::start() {
         // draw
         if (mode == Mode::Dim2) {
             waterRenderer2D->draw();
-            camera2d.drawUI();
         }
         else if (mode == Mode::Dim3) {
             waterRenderer3D->draw();
-            fpsCamera.drawUI();
         }
 
         // draw UI

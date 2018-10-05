@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <math/Vector2.h>
+#include <math/Utils.h>
 #include <immintrin.h>
 
 template <typename T, size_t NX, size_t NY>
@@ -151,7 +152,6 @@ struct Array2D<double, NX, NY> {
             return 0;
         }
         double dx = p.x - (double)x, dy = p.y - (double)y;
-        double* pv = (double*)data + (x - 1) + (y - 1) * NX;
 
     #define CUBE(x)   ((x) * (x) * (x))
     #define SQR(x)    ((x) * (x))
@@ -173,14 +173,14 @@ struct Array2D<double, NX, NY> {
 
         for (int j = 0; j < 4; j++)
         {
+            int yp = utils::clamp<int>(y+j-1, 0, NY-1);
             r[j] = 0;
             for (int i = 0; i < 4; i++)
             {
-                r[j] += u[i] * *pv;
-                pv++;
+                int xp = utils::clamp<int>(x+i-1, 0, NX-1);
+                r[j] += u[i] * data[yp][xp];
             }
             vox += v[j] * r[j];
-            pv += NX - 4;
         }
         return (vox < 0 ? 0.0 : vox);
 

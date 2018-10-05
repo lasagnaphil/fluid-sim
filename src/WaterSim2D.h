@@ -7,8 +7,10 @@
 
 #include <cstdint>
 #include <math/Utils.h>
+#include <math/Vector2.h>
+#include <StackVec.h>
+#include <HandmadeMath.h>
 #include "WaterSimSettings.h"
-#include "math/Vector2.h"
 
 #include "Array2D.h"
 #include "MACGrid2D.h"
@@ -27,14 +29,15 @@ struct WaterSim2D {
     MACGrid2D<SIZEX, SIZEY> mac = {};
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
+    Vec<Vector2d> particles = {};
 
-    Vector2d gravity = {0, -9.8};
+    double gravity = -981;
     double rho = 997.0;
 
     bool rendered = false;
     double currentTime = 0.0f;
 
-    double dt = 0.005;
+    double dt = 0.001;
     double dx = 0.001;
 
     void setup();
@@ -55,6 +58,8 @@ struct WaterSim2D {
 
     double avgPressure();
     double avgPressureInFluid();
+
+    hmm_vec2 getGridCenter();
 };
 
 
