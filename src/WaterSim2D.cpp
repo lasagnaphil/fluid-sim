@@ -37,7 +37,7 @@ void WaterSim2D::setup() {
         }
     });
 
-    // createLevelSet();
+    createLevelSet();
 }
 
 Vector2d WaterSim2D::clampPos(Vector2d pos) {
@@ -48,7 +48,7 @@ Vector2d WaterSim2D::clampPos(Vector2d pos) {
 }
 
 void WaterSim2D::runFrame() {
-    // updateLevelSet();
+    updateLevelSet();
     applyAdvection();
     applyGravity();
     applyProjection();
@@ -63,21 +63,25 @@ void WaterSim2D::update() {
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
         if (nextStage == 0) {
-            applyAdvection();
+            updateLevelSet();
         }
         else if (nextStage == 1) {
-            applyGravity();
+            applyAdvection();
         }
         else if (nextStage == 2) {
-            applyProjection();
+            applyGravity();
         }
         else if (nextStage == 3) {
-            updateCells();
+            applyProjection();
         }
-        nextStage = (nextStage + 1) % 4;
+        else if (nextStage == 4) {
+            updateCells();
+            currentTime += dt;
+        }
+        nextStage = (nextStage + 1) % 5;
         rendered = false;
     }
-     */
+    */
     runFrame();
 }
 
@@ -399,27 +403,93 @@ void WaterSim2D::createLevelSet() {
             }
         }
     });
+    iterate([&](size_t i, size_t j) {
+        if (cell(i,j) == CellType::FLUID) {
+            phi(i,j) *= -1.0;
+        }
+    });
+
 }
 
 void WaterSim2D::updateLevelSet() {
-    iterate([&](size_t i, size_t j) {
-        if (phi(i,j) * phi(i+1,j) < 0) {
-            double theta = phi(i,j) / (phi(i,j) - phi(i+1,j));
-            phi(i,j) = (signbit(phi(i,j))? 1 : -1) * theta * dx;
+    auto isSurface = new Grid2D<bool>();
+    memset(isSurface->data, false, SIZEX*SIZEY);
+    defer {delete isSurface;};
+    for (size_t j = 0; j < SIZEY - 1; j++) {
+        for (size_t i = 0; i < SIZEX - 1; i++) {
+            // TODO: why is this if condition never working???
+            if (phi(i,j) * phi(i+1,j) < 0.0) {
+                double theta1 = phi(i,j) / (phi(i,j) - phi(i+1,j));
+                double theta2 = phi(i+1,j) / (phi(i+1,j) - phi(i,j));
+                phi(i,j) = (signbit(phi(i,j))? 1 : -1) * theta1 * dx;
+                phi(i+1,j) = (signbit(phi(i+1,j))? 1 : -1) * theta2 * dx;
+                (*isSurface)(i,j) = true;
+                (*isSurface)(i+1,j) = true;
+            }
+            if (phi(i,j) * phi(i,j+1) < 0.0) {
+                double theta1 = phi(i,j) / (phi(i,j) - phi(i,j+1));
+                double theta2 = phi(i,j+1) / (phi(i,j+1) - phi(i,j));
+                phi(i,j) = (signbit(phi(i,j))? 1 : -1) * theta1 * dx;
+                phi(i,j+1) = (signbit(phi(i,j+1))? 1 : -1) * theta2 * dx;
+                (*isSurface)(i,j) = true;
+                (*isSurface)(i,j+1) = true;
+            }
         }
-    });
-    iterate([&](size_t i, size_t j) {
-        if (phi(i+1,j) * phi(i,j) >= 0) {
-            phi(i,j) = (signbit(phi(i,j))? 1 : -1) * HUGE_VAL;
+    }
+
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if (!(*isSurface)(i,j)) {
+                phi(i,j) = (signbit(phi(i,j))? 1 : -1) * HUGE_VAL;
+            }
         }
-    });
-    fastSweepIterate([&](size_t i, size_t j) {
-        double phi0 = utils::min(phi(i+1,j), phi(i,j+1));
-        double phi1 = utils::max(phi(i+1,j), phi(i,j+1));
-        double d = phi0 + dx;
-        if (d > phi1) {
-            d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
+    }
+
+    for (int i = 0; i < 2; i++) {
+        for (size_t j = 0; j < SIZEY - 1; j++) {
+            for (size_t i = 0; i < SIZEX - 1; i++) {
+                double phi0 = utils::min(phi(i+1,j), phi(i,j+1));
+                double phi1 = utils::max(phi(i+1,j), phi(i,j+1));
+                double d = phi0 + dx;
+                if (d > phi1) {
+                    d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
+                }
+                if (d < phi(i,j)) phi(i,j) = d;
+            }
         }
-        if (d < phi(i,j)) phi(i,j) = d;
-    });
+        for (size_t j = 0; j < SIZEY - 1; j++) {
+            for (size_t i = SIZEX; i-- > 1;) {
+                double phi0 = utils::min(phi(i-1,j), phi(i,j+1));
+                double phi1 = utils::max(phi(i-1,j), phi(i,j+1));
+                double d = phi0 + dx;
+                if (d > phi1) {
+                    d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
+                }
+                if (d < phi(i,j)) phi(i,j) = d;
+            }
+        }
+        for (size_t j = SIZEY; j-- > 1;) {
+            for (size_t i = 0; i < SIZEX - 1; i++) {
+                double phi0 = utils::min(phi(i+1,j), phi(i,j-1));
+                double phi1 = utils::max(phi(i+1,j), phi(i,j-1));
+                double d = phi0 + dx;
+                if (d > phi1) {
+                    d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
+                }
+                if (d < phi(i,j)) phi(i,j) = d;
+            }
+        }
+        for (size_t j = SIZEY; j-- > 1;) {
+            for (size_t i = SIZEX; i-- > 1;) {
+                double phi0 = utils::min(phi(i-1,j), phi(i,j-1));
+                double phi1 = utils::max(phi(i-1,j), phi(i,j-1));
+                double d = phi0 + dx;
+                if (d > phi1) {
+                    d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
+                }
+                if (d < phi(i,j)) phi(i,j) = d;
+            }
+        }
+    }
+
 }

@@ -32,7 +32,7 @@ struct WaterSim2D {
     Vec<Vector2d> particles = {};
     Array2D<double, SIZEX, SIZEY> phi = {};
 
-    double gravity = -9.81;
+    double gravity = -981;
     double rho = 997.0;
 
     bool rendered = false;
@@ -65,7 +65,7 @@ struct WaterSim2D {
     void createLevelSet();
     void updateLevelSet();
 
-        template <typename Fun>
+    template <typename Fun>
     void iterateU(Fun f) const {
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t i = 0; i < SIZEX + 1; i++) {

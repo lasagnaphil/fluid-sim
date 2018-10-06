@@ -29,14 +29,11 @@ class WaterRenderer2D {
 private:
     static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
-    static constexpr int ENABLE_DEBUG_UI = WaterSimSettings::Dim2D::ENABLE_DEBUG_UI;
-
-    static constexpr float CELL_SIZE = 1.0f / SIZEY;
-    static constexpr float VEL_LINE_SCALE = 10.0f / SIZEY;
 
     GLuint waterCellVAO;
     GLuint solidCellVAO;
     GLuint pressureCellVAO;
+    GLuint phiCellVAO;
     GLuint particleVAO;
 
     GLuint quadVBO;
@@ -44,25 +41,30 @@ private:
     GLuint solidCellOffsetVBO;
     GLuint pressureCellOffsetVBO;
     GLuint pressureCellValueVBO;
+    GLuint allCellOffsetVBO;
+    GLuint phiCellValueVBO;
     GLuint particleVBO;
 
-    hmm_vec2 cellVertices[SIZEX*SIZEY];
     hmm_vec2 quadVertices[6];
     StackVec<hmm_vec2, SIZEX*SIZEY> waterCellLocations = {};
     StackVec<hmm_vec2, SIZEX*SIZEY> solidCellLocations = {};
     StackVec<hmm_vec2, SIZEX*SIZEY> pressureCellLocations = {};
     StackVec<float, SIZEX*SIZEY> pressureCellValues = {};
+    StackVec<hmm_vec2, SIZEX*SIZEY> allCellLocations = {};
+    StackVec<float, SIZEX*SIZEY> phiCellValues = {};
+
     StackVec<hmm_vec2, 4*SIZEX*SIZEY> particleLocations = {};
 
     Shader cellShader;
     Shader particleShader;
-    Shader pressureShader;
+    Shader cellFieldShader;
 
     WaterSim2D* sim;
 
     bool renderParticles = true;
     bool renderCells = true;
     bool renderPressures = true;
+    bool renderLevelSet = false;
 
     const char* particleVS = R"SHADER(
 #version 330 core
@@ -99,7 +101,7 @@ void main() {
 }
 )SHADER";
 
-    const char* pressureVS = R"SHADER(
+    const char* cellFieldVS = R"SHADER(
 #version 330 core
 
 layout (location = 0) in vec2 inPos;
@@ -110,10 +112,12 @@ out vec4 color;
 
 uniform mat4 view;
 uniform mat4 proj;
+uniform vec4 posColor;
+uniform vec4 negColor;
 
 void main() {
     gl_Position = proj * view * vec4(inPos + inOffset, 0.1, 1.0);
-    color = inValue * vec4(1.0, 0.0, 0.0, 1.0) + (1 - inValue) * vec4(0.0, 0.0, 1.0, 1.0);
+    color = inValue * posColor + (1 - inValue) * negColor;
 }
 )SHADER";
 
@@ -140,24 +144,32 @@ public:
 
         cellShader = Shader::fromStr(cellVS, cellFS);
         particleShader = Shader::fromStr(particleVS, cellFS);
-        pressureShader = Shader::fromStr(pressureVS, cellFS);
+        cellFieldShader = Shader::fromStr(cellFieldVS, cellFS);
 
         memcpy(quadVertices, origQuadVertices, sizeof(origQuadVertices));
         for (int i = 0; i < 6*36; i++) {
             quadVertices[i] *= sim->dx;
         }
 
+        allCellLocations.size = SIZEX*SIZEY;
+        sim->iterate([&](size_t i, size_t j) {
+            allCellLocations[j*SIZEX + i] = HMM_Vec2(i,j) * sim->dx;
+        });
+
         updateBuffers();
 
         glGenVertexArrays(1, &waterCellVAO);
         glGenVertexArrays(1, &solidCellVAO);
         glGenVertexArrays(1, &pressureCellVAO);
+        glGenVertexArrays(1, &phiCellVAO);
         glGenVertexArrays(1, &particleVAO);
         glGenBuffers(1, &quadVBO);
         glGenBuffers(1, &waterCellOffsetVBO);
         glGenBuffers(1, &solidCellOffsetVBO);
         glGenBuffers(1, &pressureCellOffsetVBO);
         glGenBuffers(1, &pressureCellValueVBO);
+        glGenBuffers(1, &allCellOffsetVBO);
+        glGenBuffers(1, &phiCellValueVBO);
         glGenBuffers(1, &particleVBO);
 
         glBindVertexArray(waterCellVAO);
@@ -203,6 +215,24 @@ public:
         glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), 0);
         glVertexAttribDivisor(2, 1);
 
+        glBindVertexArray(phiCellVAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, allCellOffsetVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * SIZEX*SIZEY, allCellLocations.data, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
+        glVertexAttribDivisor(1, 1);
+
+        glBindBuffer(GL_ARRAY_BUFFER, phiCellValueVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(float) * SIZEX*SIZEY, phiCellValues.data, GL_DYNAMIC_DRAW);
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), 0);
+        glVertexAttribDivisor(2, 1);
+
         glBindVertexArray(particleVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
@@ -214,7 +244,7 @@ public:
 
         camera->addShader(&cellShader);
         camera->addShader(&particleShader);
-        camera->addShader(&pressureShader);
+        camera->addShader(&cellFieldShader);
     }
 
     void update() {
@@ -227,6 +257,7 @@ public:
                 glBindVertexArray(solidCellVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * solidCellLocations.size, solidCellLocations.data);
+                glBindVertexArray(0);
             }
             if (renderPressures) {
                 glBindVertexArray(pressureCellVAO);
@@ -235,11 +266,18 @@ public:
                 glBindVertexArray(particleVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, pressureCellValueVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * pressureCellValues.size, pressureCellValues.data);
+                glBindVertexArray(0);
             }
             if (renderParticles) {
                 glBindVertexArray(particleVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec2) * particleLocations.size, particleLocations.data);
+                glBindVertexArray(0);
+            }
+            if (renderLevelSet) {
+                glBindVertexArray(phiCellVAO);
+                glBindBuffer(GL_ARRAY_BUFFER, phiCellValueVBO);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * phiCellValues.size, phiCellValues.data);
                 glBindVertexArray(0);
             }
         }
@@ -257,7 +295,9 @@ public:
             glBindVertexArray(0);
         }
         if (renderPressures) {
-            pressureShader.use();
+            cellFieldShader.use();
+            cellFieldShader.setVector4("posColor", HMM_Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+            cellFieldShader.setVector4("negColor", HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f));
             glBindVertexArray(pressureCellVAO);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, pressureCellLocations.size);
             glBindVertexArray(0);
@@ -270,53 +310,29 @@ public:
             glBindVertexArray(0);
         }
 
+        if (renderLevelSet) {
+            cellFieldShader.use();
+            cellFieldShader.setVector4("posColor", HMM_Vec4(1.0f, 0.0f, 0.0f, 1.0f));
+            cellFieldShader.setVector4("negColor", HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f));
+            glBindVertexArray(phiCellVAO);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 6, allCellLocations.size);
+            glBindVertexArray(0);
+        }
+
     }
 
     void drawUI() {
-        if (ENABLE_DEBUG_UI) {
-            ImGui::Begin("Water Simulation");
-            ImGui::Text("Current frame: %f", sim->currentTime);
-            ImGui::Text("Average pressure: %f", sim->avgPressure());
-            ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
-            ImGui::Checkbox("Render cells", &renderCells);
-            ImGui::Checkbox("Render pressures", &renderPressures);
-            ImGui::Checkbox("Render particles", &renderParticles);
+        ImGui::Begin("Water Simulation");
 
-            /*
-            if (ImGui::CollapsingHeader("Pressure")) {
-                ImGui::Columns(SIZEY, "table_p");
-                ImGui::Separator();
-                for (size_t j = 0; j < SIZEY; j++) {
-                    for (size_t i = 0; i < SIZEX; i++) {
-                        char fstr[32];
-                        sprintf(fstr, "%6f", sim->p(i, SIZEY - 1 - j));
-                        ImGui::Text(fstr);
-                        ImGui::NextColumn();
-                    }
-                    ImGui::Separator();
-                }
-                ImGui::Columns(1);
-                ImGui::Separator();
-            }
-            if (ImGui::CollapsingHeader("Velocity")) {
-                ImGui::Columns(SIZEY, "table_vel");
-                ImGui::Separator();
-                for (size_t j = 0; j < SIZEY; j++) {
-                    for (size_t i = 0; i < SIZEX; i++) {
-                        char fstr[32];
-                        Vector2d v = sim->mac.vel(i, SIZEY - 1 - j);
-                        sprintf(fstr, "%2.2f %2.2f %2.2f", v.x, v.y);
-                        ImGui::Text(fstr);
-                        ImGui::NextColumn();
-                    }
-                    ImGui::Separator();
-                }
-                ImGui::Columns(1);
-                ImGui::Separator();
-            }
-             */
-            ImGui::End();
-        }
+        ImGui::Text("Current frame: %f", sim->currentTime);
+        ImGui::Text("Average pressure: %f", sim->avgPressure());
+        ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
+        ImGui::Checkbox("Render cells", &renderCells);
+        ImGui::Checkbox("Render pressures", &renderPressures);
+        ImGui::Checkbox("Render particles", &renderParticles);
+        ImGui::Checkbox("Render level set", &renderLevelSet);
+
+        ImGui::End();
     }
 
     void updateBuffers() {
@@ -351,7 +367,62 @@ public:
                 particleLocations[i].Y = (float)sim->particles[i].y;
             }
         }
+        phiCellValues.size = 0;
+        if (renderLevelSet) {
+            sim->iterate([&](size_t i, size_t j) {
+                phiCellValues.push(utils::sigmoid<float>(100.f * sim->phi(i,j)));
+            });
+        }
     }
+
+    /*
+    void createWaterMesh() {
+        float dx = (float)sim->dx;
+        StackVec<hmm_vec2, 4> contourLookupTable[16] = {};
+        contourLookupTable[1].push(HMM_Vec2(0, 0.5f));
+        contourLookupTable[1].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[2].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[2].push(HMM_Vec2(1, 0.5f));
+        contourLookupTable[3].push(HMM_Vec2(0, 0.5f));
+        contourLookupTable[3].push(HMM_Vec2(1, 0.5f));
+        contourLookupTable[4].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[4].push(HMM_Vec2(1, 0.5f));
+        contourLookupTable[5].push(HMM_Vec2(0, 0.5f));
+        contourLookupTable[5].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[5].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[5].push(HMM_Vec2(1, 0.5f));
+        contourLookupTable[6].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[6].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[7].push(HMM_Vec2(0, 0.5f));
+        contourLookupTable[7].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[8].push(HMM_Vec2(0, 0.5f));
+        contourLookupTable[8].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[9].push(HMM_Vec2(0.5f, 0));
+        contourLookupTable[9].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
+        contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
+
+        auto phiSign = new Array2D<bool, SIZEX, SIZEY>();
+        defer {delete phiSign;};
+        sim->iterate([&](size_t i, size_t j) {
+            (*phiSign)(i,j) = sim->phi(i,j) > 0;
+        });
+
+        for (size_t j = 0; j < SIZEY - 1; j++) {
+            for (size_t i = 0; i < SIZEX - 1; i++) {
+                int key = ((*phiSign)(i+1,j+1) * 8) + ((*phiSign)(i,j+1) * 4)
+                        + ((*phiSign)(i+1,j) * 2) + ((*phiSign)(i,j));
+                switch (key) {
+                    case 0:
+
+                }
+
+            }
+        }
+    }
+     */
 };
 
 #endif //FLUID_SIM_WATERRENDERER2D_H
