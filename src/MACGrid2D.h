@@ -16,41 +16,6 @@ struct MACGrid2D {
     Array2D<double, NX, NY + 1> v;
     double dx = 1;
 
-    template <typename Fun>
-    void iterateU(Fun f) const {
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX + 1; i++) {
-                f(i, j);
-            }
-        }
-    }
-
-    template <typename Fun>
-    void iterateV(Fun f) {
-        for (size_t j = 0; j < NY + 1; j++) {
-            for (size_t i = 0; i < NX; i++) {
-                f(i, j);
-            }
-        }
-    }
-
-    template <typename Fun>
-    void iterate(Fun f) {
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX; i++) {
-                f(i, j);
-            }
-        }
-    }
-
-    template <typename Fun>
-    void iterateBackwards(Fun f) {
-        for (size_t j = NY; j-- > 0;) {
-            for (size_t i = NX; i-- > 0;) {
-                f(i, j);
-            }
-        }
-    }
 
     Vector2d velU(size_t i, size_t j) {
         if (i > 0 && i < NX)

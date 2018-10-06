@@ -30,8 +30,9 @@ struct WaterSim2D {
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
     Vec<Vector2d> particles = {};
+    Array2D<double, SIZEX, SIZEY> phi = {};
 
-    double gravity = -981;
+    double gravity = -9.81;
     double rho = 997.0;
 
     bool rendered = false;
@@ -60,6 +61,72 @@ struct WaterSim2D {
     double avgPressureInFluid();
 
     hmm_vec2 getGridCenter();
+
+    void createLevelSet();
+    void updateLevelSet();
+
+        template <typename Fun>
+    void iterateU(Fun f) const {
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX + 1; i++) {
+                f(i, j);
+            }
+        }
+    }
+
+    template <typename Fun>
+    void iterateV(Fun f) {
+        for (size_t j = 0; j < SIZEY + 1; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                f(i, j);
+            }
+        }
+    }
+
+    template <typename Fun>
+    void iterate(Fun f) {
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                f(i, j);
+            }
+        }
+    }
+
+    template <typename Fun>
+    void iterateBackwards(Fun f) {
+        for (size_t j = SIZEY; j-- > 0;) {
+            for (size_t i = SIZEX; i-- > 0;) {
+                f(i, j);
+            }
+        }
+    }
+
+    template <typename Fun>
+    void fastSweepIterate(Fun f) {
+        // Sweep with four possible directions, two times (to make sure)
+        for (int i = 0; i < 2; i++) {
+            for (size_t j = 0; j < SIZEY; j++) {
+                for (size_t i = 0; i < SIZEX; i++) {
+                    f(i, j);
+                }
+            }
+            for (size_t j = 0; j < SIZEY; j++) {
+                for (size_t i = SIZEX; i-- > 0;) {
+                    f(i, j);
+                }
+            }
+            for (size_t j = SIZEY; j-- > 0;) {
+                for (size_t i = 0; i < SIZEX; i++) {
+                    f(i, j);
+                }
+            }
+            for (size_t j = SIZEY; j-- > 0;) {
+                for (size_t i = SIZEX; i-- > 0;) {
+                    f(i, j);
+                }
+            }
+        }
+    }
 };
 
 

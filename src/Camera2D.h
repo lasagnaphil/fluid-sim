@@ -26,7 +26,7 @@ struct Camera2D {
     void drawUI();
 
     AppSettings* settings;
-    StackVec<Shader*, 4> shaders = {};
+    StackVec<Shader*, 16> shaders = {};
 
     float speed = 5.0f;
     float pixelsPerMeter = 100.0f;
