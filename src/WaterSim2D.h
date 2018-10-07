@@ -110,7 +110,7 @@ struct WaterSim2D {
     template <typename Fun>
     void fastSweepIterate(Fun f) {
         // Sweep with four possible directions, two times (to make sure)
-        for (int i = 0; i < 2; i++) {
+        for (int k = 0; k < 2; k++) {
             for (size_t j = 0; j < SIZEY; j++) {
                 for (size_t i = 0; i < SIZEX; i++) {
                     f(i, j);

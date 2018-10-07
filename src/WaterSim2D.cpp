@@ -111,7 +111,7 @@ void WaterSim2D::applyAdvection() {
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.normalize() + 10e-37);
+            double dtau = C * dx / (k1.norm() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -132,7 +132,7 @@ void WaterSim2D::applyAdvection() {
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.normalize() + 10e-37);
+            double dtau = C * dx / (k1.norm() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -477,16 +477,15 @@ void WaterSim2D::updateLevelSet() {
 
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
-            if (!(*isSurface)(i,j) && phi(i,j) < 0) {
-                phi(i,j) = -HUGE_VAL;
+            if (!(*isSurface)(i,j)) {
+                phi(i,j) = utils::sgn(phi(i,j)) * HUGE_VAL;
             }
         }
     }
 
-    for (int i = 0; i < 2; i++) {
+    for (int k = 0; k < 2; k++) {
         for (size_t j = 0; j < SIZEY - 1; j++) {
             for (size_t i = 0; i < SIZEX - 1; i++) {
-                if (phi(i,j) >= 0) continue;
                 double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
                 double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
@@ -500,7 +499,6 @@ void WaterSim2D::updateLevelSet() {
         }
         for (size_t j = 0; j < SIZEY - 1; j++) {
             for (size_t i = SIZEX; i-- > 1;) {
-                if (phi(i,j) >= 0) continue;
                 double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j+1)));
                 double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
@@ -514,7 +512,6 @@ void WaterSim2D::updateLevelSet() {
         }
         for (size_t j = SIZEY; j-- > 1;) {
             for (size_t i = 0; i < SIZEX - 1; i++) {
-                if (phi(i,j) >= 0) continue;
                 double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j-1)));
                 double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
@@ -528,7 +525,6 @@ void WaterSim2D::updateLevelSet() {
         }
         for (size_t j = SIZEY; j-- > 1;) {
             for (size_t i = SIZEX; i-- > 1;) {
-                if (phi(i,j) >= 0) continue;
                 double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j-1)));
                 double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
@@ -553,7 +549,7 @@ void WaterSim2D::updateLevelSet() {
             size_t ip = i == SIZEX-1? SIZEX-1 : i+1;
             size_t jp = j == SIZEY-1? SIZEY-1 : j+1;
             double avg = 0.25 * ((*oldPhi)(im,j) + (*oldPhi)(ip,j) + (*oldPhi)(i,jm) + (*oldPhi)(i,jp));
-            if (avg < (*oldPhi)(i,j))
+            if (avg < phi(i,j))
                 phi(i,j) = avg;
         }
     }
