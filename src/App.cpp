@@ -176,7 +176,7 @@ void App::start() {
     Uint32 frameTime;
     Uint32 lastFrameTime = SDL_GetTicks();
 
-    constexpr Uint32 msPerFrame = 16;
+    // constexpr Uint32 msPerFrame = 16;
 
     while (!quit) {
         frameTime = SDL_GetTicks();
@@ -251,9 +251,11 @@ void App::start() {
 
         SDL_GL_SwapWindow(window);
 
+        /*
         Uint32 totalFrameTime = SDL_GetTicks() - frameTime;
         if (totalFrameTime < msPerFrame) {
             SDL_Delay(msPerFrame - (SDL_GetTicks() - frameTime));
         }
+         */
     }
 }

@@ -62,9 +62,9 @@ private:
     WaterSim2D* sim;
 
     bool renderParticles = true;
-    bool renderCells = true;
-    bool renderPressures = true;
-    bool renderLevelSet = false;
+    bool renderCells = false;
+    bool renderPressures = false;
+    bool renderLevelSet = true;
 
     const char* particleVS = R"SHADER(
 #version 330 core
@@ -323,8 +323,8 @@ public:
 
     void drawUI() {
         ImGui::Begin("Water Simulation");
-
         ImGui::Text("Current frame: %f", sim->currentTime);
+        ImGui::Text("Current stage: %s", sim->printStage());
         ImGui::Text("Average pressure: %f", sim->avgPressure());
         ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
         ImGui::Checkbox("Render cells", &renderCells);

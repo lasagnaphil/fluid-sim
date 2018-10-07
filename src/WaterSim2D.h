@@ -32,14 +32,20 @@ struct WaterSim2D {
     Vec<Vector2d> particles = {};
     Array2D<double, SIZEX, SIZEY> phi = {};
 
-    double gravity = -981;
-    double rho = 997.0;
+    const double gravity = -9.81;
+    const double rho = 997.0;
 
     bool rendered = false;
     double currentTime = 0.0f;
 
-    double dt = 0.001;
-    double dx = 0.001;
+    const double dt = 0.001;
+    const double dx = 0.001;
+    const double dr = 0.0009; // water particle radius
+
+    enum class StageType {
+        Init, CreateLevelSet, UpdateLevelSet, ApplyAdvection, ApplyGravity, ApplyProjection, UpdateCells
+    };
+    StageType stage;
 
     void setup();
 
@@ -125,6 +131,19 @@ struct WaterSim2D {
                     f(i, j);
                 }
             }
+        }
+    }
+
+    const char* printStage() {
+        switch(stage) {
+            case StageType::Init: return "Init";
+            case StageType::CreateLevelSet: return "CreateLevelSet";
+            case StageType::UpdateLevelSet: return "UpdateLevelSet";
+            case StageType::ApplyAdvection: return "ApplyAdvection";
+            case StageType::ApplyGravity: return "ApplyGravity";
+            case StageType::ApplyProjection: return "ApplyProjection";
+            case StageType::UpdateCells: return "UpdateCells";
+            default: return nullptr;
         }
     }
 };
