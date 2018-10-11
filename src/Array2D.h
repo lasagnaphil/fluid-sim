@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <math/Vector2.h>
 #include <math/Utils.h>
+#include <Map.h>
 #include <immintrin.h>
 
 template <typename T, size_t NX, size_t NY>
@@ -25,8 +26,12 @@ struct Array2D {
         return data[j][i];
     }
 
+    void reset() {
+        memset(data, 0, sizeof(T)*NY*NX);
+    }
+
     Array2D& operator+=(const Array2D& rhs) {
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 (*this)(i,j) += rhs(i,j);
         return *this;
@@ -34,14 +39,14 @@ struct Array2D {
 
     // TODO: FMA this
     void setMultiplyAdd(Array2D& a, T b, const Array2D& c) {
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 (*this)(i,j) = a(i,j) + b * c(i,j);
     }
 
     T innerProduct(const Array2D& rhs) const {
         T result = {};
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 result += (*this)(i,j)*rhs(i,j);
         return result;
@@ -49,7 +54,7 @@ struct Array2D {
 
     T infiniteNorm() const {
         T result = {};
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++) {
                 if (abs((*this)(i,j)) > result) result = abs((*this)(i,j));
             }
@@ -116,30 +121,43 @@ struct Array2D<double, NX, NY> {
         return data[j][i];
     }
 
+    void reset() {
+        memset(data, 0, sizeof(double)*NY*NX);
+    }
+
     Array2D& operator+=(const Array2D& rhs) {
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 (*this)(i,j) += rhs(i,j);
         return *this;
     }
 
     void setMultiplyAdd(Array2D& a, double b, const Array2D& c) {
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 (*this)(i,j) = a(i,j) + b * c(i,j);
     }
 
     double innerProduct(const Array2D& rhs) const {
         double result = {};
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++)
                 result += (*this)(i,j)*rhs(i,j);
         return result;
     }
 
+    double normsq() const {
+        double result = {};
+        for (size_t j = 0; j < NY; j++) {
+            for (size_t i = 0; i < NX; i++) {
+                result += (*this)(i,j)*(*this)(i,j);
+            }
+        }
+        return result;
+    }
     double infiniteNorm() const {
         double result = {};
-        for (size_t j = 0; j < NY + 1; j++)
+        for (size_t j = 0; j < NY; j++)
             for (size_t i = 0; i < NX; i++) {
                 if (abs((*this)(i,j)) > result) result = abs((*this)(i,j));
             }

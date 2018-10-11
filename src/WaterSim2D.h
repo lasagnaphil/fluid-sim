@@ -61,6 +61,8 @@ struct WaterSim2D {
 
     void updateCells();
 
+    void updateVelocity();
+
     Vector2d clampPos(Vector2d pos);
 
     double avgPressure();

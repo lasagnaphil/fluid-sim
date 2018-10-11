@@ -53,7 +53,7 @@ private:
     StackVec<hmm_vec2, SIZEX*SIZEY> allCellLocations = {};
     StackVec<float, SIZEX*SIZEY> phiCellValues = {};
 
-    StackVec<hmm_vec2, 4*SIZEX*SIZEY> particleLocations = {};
+    StackVec<hmm_vec2, 8*SIZEX*SIZEY> particleLocations = {};
 
     Shader cellShader;
     Shader particleShader;
@@ -62,9 +62,9 @@ private:
     WaterSim2D* sim;
 
     bool renderParticles = true;
-    bool renderCells = false;
-    bool renderPressures = false;
-    bool renderLevelSet = true;
+    bool renderCells = true;
+    bool renderPressures = true;
+    bool renderLevelSet = false;
 
     const char* particleVS = R"SHADER(
 #version 330 core
@@ -236,7 +236,7 @@ public:
         glBindVertexArray(particleVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * 4*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec2) * 8*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(hmm_vec2), 0);
 
@@ -306,7 +306,7 @@ public:
         if (renderParticles) {
             particleShader.use();
             glBindVertexArray(particleVAO);
-            glDrawArrays(GL_POINTS, 0, particleLocations.size);
+            glDrawArrays(GL_LINES, 0, particleLocations.size);
             glBindVertexArray(0);
         }
 
@@ -335,6 +335,12 @@ public:
         ImGui::End();
     }
 
+    hmm_vec2 double_to_float(Vector2d vec) {
+        return HMM_Vec2((float)vec.x,(float)vec.y);
+    }
+
+    static constexpr float VEL_SIZE = 0.01f;
+
     void updateBuffers() {
         if (renderCells) {
             waterCellLocations.size = 0;
@@ -361,16 +367,18 @@ public:
             });
         }
         if (renderParticles) {
-            particleLocations.size = sim->particles.size;
+            particleLocations.size = 2*sim->particles.size;
             for (size_t i = 0; i < sim->particles.size; i++) {
-                particleLocations[i].X = (float)sim->particles[i].x;
-                particleLocations[i].Y = (float)sim->particles[i].y;
+                particleLocations[2*i].X = (float)sim->particles[i].x;
+                particleLocations[2*i].Y = (float)sim->particles[i].y;
+                particleLocations[2*i + 1].X = (float)sim->particles[i].x + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).x;
+                particleLocations[2*i + 1].Y = (float)sim->particles[i].y + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).y;
             }
         }
         phiCellValues.size = 0;
         if (renderLevelSet) {
             sim->iterate([&](size_t i, size_t j) {
-                phiCellValues.push(utils::sigmoid<float>(100.f * sim->phi(i,j)));
+                phiCellValues.push(utils::sigmoid<float>(1.0f * sim->phi(i,j)));
             });
         }
     }

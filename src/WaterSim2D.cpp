@@ -27,6 +27,18 @@ void WaterSim2D::setup() {
             cell(i, j) = CellType::EMPTY;
         }
     });
+    /*
+    cell(63,12) = CellType::SOLID;
+    cell(63,13) = CellType::SOLID;
+    cell(63,14) = CellType::SOLID;
+    cell(64,12) = CellType::SOLID;
+    cell(64,13) = CellType::SOLID;
+    cell(64,14) = CellType::SOLID;
+    cell(65,12) = CellType::SOLID;
+    cell(65,13) = CellType::SOLID;
+    cell(65,14) = CellType::SOLID;
+     */
+
     particles.reserve(fluidCount);
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
@@ -58,6 +70,7 @@ void WaterSim2D::runFrame() {
     applyGravity();
     stage = StageType::ApplyProjection;
     applyProjection();
+    updateVelocity();
     stage = StageType::UpdateCells;
     updateCells();
     rendered = false;
@@ -65,16 +78,16 @@ void WaterSim2D::runFrame() {
 }
 
 void WaterSim2D::update() {
-    /*
     auto inputMgr = InputManager::get();
+    /*
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
         if (stage == StageType::Init) {
             stage = StageType::CreateLevelSet;
-            createLevelSet();
+            // createLevelSet();
         }
         else if (stage == StageType::CreateLevelSet) {
             stage = StageType::UpdateLevelSet;
-            updateLevelSet();
+            // updateLevelSet();
         }
         else if (stage == StageType::UpdateLevelSet) {
             stage = StageType::ApplyAdvection;
@@ -87,6 +100,7 @@ void WaterSim2D::update() {
         else if (stage == StageType::ApplyGravity) {
             stage = StageType::ApplyProjection;
             applyProjection();
+            updateVelocity();
         }
         else if (stage == StageType::ApplyProjection) {
             stage = StageType::UpdateCells;
@@ -95,12 +109,17 @@ void WaterSim2D::update() {
         }
         else if (stage == StageType::UpdateCells) {
             stage = StageType::CreateLevelSet;
-            createLevelSet();
+            // createLevelSet();
         }
         rendered = false;
     }
      */
     runFrame();
+    /*
+    if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
+        runFrame();
+    }
+     */
 }
 
 void WaterSim2D::applyAdvection() {
@@ -263,6 +282,7 @@ void WaterSim2D::applyProjection() {
     };
 
     // use PCG algorithm to solve the linear equation
+    p.reset();
     r = rhs;
     applyPreconditioner();
     s = z;
@@ -295,23 +315,24 @@ void WaterSim2D::applyProjection() {
 
         iter++;
     }
+    if (iter == maxIters) {
+        log_error("Maximum iteration limit exceeded!");
+    }
 
-    // set pressure of empty cells to zero
-    iterate([&](size_t i, size_t j) {
-        if (cell(i,j) == CellType::EMPTY) {
-            p(i,j) = 0;
-        }
-    });
+    gridStack.free();
+}
 
+void WaterSim2D::updateVelocity() {
     // update velocity using the solved pressure
     {
         double scale = dt / (rho * dx);
-        for (size_t j = 1; j < SIZEY; j++) {
-            for (size_t i = 1; i < SIZEX; i++) {
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
                 if (cell(i-1,j) == CellType::FLUID || cell(i,j) == CellType::FLUID) {
                     if (cell(i-1,j) == CellType::SOLID || cell(i,j) == CellType::SOLID) {
                         mac.u(i,j) = 0; // usolid(i,j);
                     }
+                    /*
                     else if (cell(i-1,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         mac.u(i,j) -= scale * utils::min((phi(i,j) - phi(i-1,j)) / phi(i,j), 1e3) * p(i,j);
@@ -320,6 +341,7 @@ void WaterSim2D::applyProjection() {
                         // account for ghost pressures
                         mac.u(i,j) -= scale * utils::min((phi(i,j) - phi(i-1,j)) / phi(i-1,j), 1e3) * p(i-1,j);
                     }
+                     */
                     else {
                         mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
                     }
@@ -332,6 +354,7 @@ void WaterSim2D::applyProjection() {
                     if (cell(i,j-1) == CellType::SOLID || cell(i,j) == CellType::SOLID) {
                         mac.v(i,j) = 0;
                     }
+                    /*
                     else if (cell(i,j-1) == CellType::EMPTY) {
                         // account for ghost pressures
                         mac.v(i,j) -= scale * utils::min((phi(i,j) - phi(i,j-1)) / phi(i,j), 1e3) * p(i,j);
@@ -340,6 +363,7 @@ void WaterSim2D::applyProjection() {
                         // account for ghost pressures
                         mac.v(i,j) -= scale * utils::min((phi(i,j) - phi(i,j-1)) / phi(i,j-1), 1e3) * p(i,j-1);
                     }
+                     */
                     else {
                         mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
                     }
@@ -350,12 +374,8 @@ void WaterSim2D::applyProjection() {
                 }
             }
         }
-        iterate([&](size_t i, size_t j) {
-
-        });
     }
-
-    gridStack.free();
+    // TODO: for unknown cells, extrapolate velocity using p.65 (BFS)
 }
 
 void WaterSim2D::updateCells() {
@@ -449,7 +469,6 @@ void WaterSim2D::createLevelSet() {
 
 }
 
-// TODO: Still buggy
 void WaterSim2D::updateLevelSet() {
     auto isSurface = new Grid2D<bool>();
     memset(isSurface->data, false, SIZEX*SIZEY);
@@ -477,8 +496,8 @@ void WaterSim2D::updateLevelSet() {
 
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
-            if (!(*isSurface)(i,j)) {
-                phi(i,j) = utils::sgn(phi(i,j)) * HUGE_VAL;
+            if (!(*isSurface)(i,j) && phi(i,j) < 0) {
+                phi(i,j) = -HUGE_VAL;
             }
         }
     }
