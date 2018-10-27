@@ -6,10 +6,8 @@
 #define FLUID_SIM_WATERSIM2D_H
 
 #include <cstdint>
-#include <math/Utils.h>
-#include <math/Vector2.h>
 #include <StackVec.h>
-#include <HandmadeMath.h>
+#include <mathfu/glsl_mappings.h>
 #include "WaterSimSettings.h"
 
 #include "Array2D.h"
@@ -29,7 +27,7 @@ struct WaterSim2D {
     MACGrid2D<SIZEX, SIZEY> mac = {};
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
-    Vec<Vector2d> particles = {};
+    Vec<mathfu::vec2d> particles = {};
     Array2D<double, SIZEX, SIZEY> phi = {};
 
     const double gravity = -9.81;
@@ -63,12 +61,12 @@ struct WaterSim2D {
 
     void updateVelocity();
 
-    Vector2d clampPos(Vector2d pos);
+    mathfu::vec2d clampPos(mathfu::vec2d pos);
 
     double avgPressure();
     double avgPressureInFluid();
 
-    hmm_vec2 getGridCenter();
+    mathfu::vec2d getGridCenter();
 
     void createLevelSet();
     void updateLevelSet();

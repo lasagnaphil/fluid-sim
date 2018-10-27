@@ -6,10 +6,8 @@
 #define FLUID_SIM_ARRAY2D_H
 
 #include <cstddef>
-#include <math/Vector2.h>
-#include <math/Utils.h>
+#include <mathfu/vector.h>
 #include <Map.h>
-#include <immintrin.h>
 
 template <typename T, size_t NX, size_t NY>
 struct Array2D {
@@ -61,7 +59,7 @@ struct Array2D {
         return result;
     }
 
-    T triCubic(Vector2<T> p) {
+    T triCubic(mathfu::Vector<T, 2> p) {
         int x = (int) p.x, y = (int) p.y;
         if (x < 0 || x >= NX || y < 0 || y >= NY) {
             return 0;
@@ -102,108 +100,6 @@ struct Array2D {
 
 #undef CUBE
 #undef SQR
-    }
-};
-
-// TODO: Specialize this using SIMD
-template <size_t NX, size_t NY>
-struct Array2D<double, NX, NY> {
-    double data[NY][NX] = {};
-
-    void copyFrom(Array2D& arr) {
-        memcpy(data, arr.data, sizeof(double)*NX*NY);
-    }
-
-    double& operator()(size_t i, size_t j) {
-        return data[j][i];
-    }
-    const double& operator()(size_t i, size_t j) const {
-        return data[j][i];
-    }
-
-    void reset() {
-        memset(data, 0, sizeof(double)*NY*NX);
-    }
-
-    Array2D& operator+=(const Array2D& rhs) {
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
-                (*this)(i,j) += rhs(i,j);
-        return *this;
-    }
-
-    void setMultiplyAdd(Array2D& a, double b, const Array2D& c) {
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
-                (*this)(i,j) = a(i,j) + b * c(i,j);
-    }
-
-    double innerProduct(const Array2D& rhs) const {
-        double result = {};
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
-                result += (*this)(i,j)*rhs(i,j);
-        return result;
-    }
-
-    double normsq() const {
-        double result = {};
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX; i++) {
-                result += (*this)(i,j)*(*this)(i,j);
-            }
-        }
-        return result;
-    }
-    double infiniteNorm() const {
-        double result = {};
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++) {
-                if (abs((*this)(i,j)) > result) result = abs((*this)(i,j));
-            }
-        return result;
-    }
-
-    double triCubic(Vector2d p) {
-        int x = (int) p.x, y = (int) p.y;
-        if (x < 0 || x >= NX || y < 0 || y >= NY) {
-            return 0;
-        }
-        double dx = p.x - (double)x, dy = p.y - (double)y;
-
-    #define CUBE(x)   ((x) * (x) * (x))
-    #define SQR(x)    ((x) * (x))
-
-        /* factors for Catmull-Rom interpolation */
-        double u[4], v[4];
-        double r[4];
-        double vox = 0;
-
-        u[0] = -0.5 * CUBE (dx) + SQR (dx) - 0.5 * dx;
-        u[1] =  1.5 * CUBE (dx) - 2.5 * SQR (dx) + 1;
-        u[2] = -1.5 * CUBE (dx) + 2 * SQR (dx) + 0.5 * dx;
-        u[3] =  0.5 * CUBE (dx) - 0.5 * SQR (dx);
-
-        v[0] = -0.5 * CUBE (dy) + SQR (dy) - 0.5 * dy;
-        v[1] =  1.5 * CUBE (dy) - 2.5 * SQR (dy) + 1;
-        v[2] = -1.5 * CUBE (dy) + 2 * SQR (dy) + 0.5 * dy;
-        v[3] =  0.5 * CUBE (dy) - 0.5 * SQR (dy);
-
-        for (int j = 0; j < 4; j++)
-        {
-            int yp = utils::clamp<int>(y+j-1, 0, NY-1);
-            r[j] = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                int xp = utils::clamp<int>(x+i-1, 0, NX-1);
-                r[j] += u[i] * data[yp][xp];
-            }
-            vox += v[j] * r[j];
-        }
-        return (vox < 0 ? 0.0 : vox);
-
-    #undef CUBE
-    #undef SQR
     }
 };
 

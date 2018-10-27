@@ -9,7 +9,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
-#include <math/Vector3.h>
+#include <mathfu/vector.h>
 #include <math/Utils.h>
 
 template <typename T, size_t NX, size_t NY, size_t NZ>
@@ -63,7 +63,7 @@ struct Array3D {
     }
 
     // from http://www.realtimerendering.com/resources/GraphicsGems/gemsv/ch3-3/tricubic.c
-    T triCubic(Vector3<T> p)
+    T triCubic(mathfu::Vector<T, 3> p)
     {
         int x = (int) p.x, y = (int) p.y, z = (int) p.z;
         if (x < 0 || x >= NX || y < 0 || y >= NY || z < 0 || z >= NZ)

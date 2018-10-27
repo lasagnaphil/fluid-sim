@@ -4,8 +4,11 @@
 
 #include <Defer.h>
 #include <ctime>
+#include <math/Utils.h>
 #include "WaterSim2D.h"
 #include "InputManager.h"
+
+using namespace mathfu;
 
 inline double randf() {
     return ((double)rand()/(double)RAND_MAX) * 0.5;
@@ -42,18 +45,18 @@ void WaterSim2D::setup() {
     particles.reserve(fluidCount);
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
-            particles.push(Vector2d::create((double)i + randf(), (double)j + randf()) * dx);
-            particles.push(Vector2d::create((double)i + 0.5 + randf(), (double)j + randf()) * dx);
-            particles.push(Vector2d::create((double)i + randf(), (double)j + 0.5 + randf()) * dx);
-            particles.push(Vector2d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx);
+            particles.push(vec2d((double)i + randf(), (double)j + randf()) * dx);
+            particles.push(vec2d((double)i + 0.5 + randf(), (double)j + randf()) * dx);
+            particles.push(vec2d((double)i + randf(), (double)j + 0.5 + randf()) * dx);
+            particles.push(vec2d((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx);
         }
     });
 
     createLevelSet();
 }
 
-Vector2d WaterSim2D::clampPos(Vector2d pos) {
-    Vector2d clamped = {};
+vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
+    vec2d clamped;
     clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX * dx - 1e-10);
     clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY * dx - 1e-10);
     return clamped;
@@ -125,12 +128,12 @@ void WaterSim2D::update() {
 void WaterSim2D::applyAdvection() {
     double C = 5;
     iterateU([&](size_t i, size_t j) {
-        Vector2d x_p = Vector2d::create((double)i, ((double)j + 0.5)) * dx;
+        vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
         double tau = 0;
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.norm() + 10e-37);
+            double dtau = C * dx / (k1.Normalize() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -146,12 +149,12 @@ void WaterSim2D::applyAdvection() {
         mac.u(i,j) = mac.velInterpU(x_p);
     });
     iterateV([&](size_t i, size_t j) {
-        Vector2d x_p = Vector2d::create((double)i + 0.5, ((double)j)) * dx;
+        vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
         double tau = 0;
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.norm() + 10e-37);
+            double dtau = C * dx / (k1.Normalize() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -423,8 +426,8 @@ double WaterSim2D::avgPressureInFluid() {
     return avgP;
 }
 
-hmm_vec2 WaterSim2D::getGridCenter() {
-    return HMM_Vec2(SIZEX * dx / 2, SIZEY * dx / 2);
+vec2d WaterSim2D::getGridCenter() {
+    return vec2d(SIZEX * dx / 2, SIZEY * dx / 2);
 }
 
 void WaterSim2D::createLevelSet() {

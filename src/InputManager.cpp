@@ -6,19 +6,6 @@
 
 InputManager InputManager::inst = {};
 
-/*
-InputManager InputManager::create() {
-    InputManager eventManager;
-    eventManager.currMouse = 0;
-    eventManager.prevMouse = 0;
-    eventManager.currMousePos = Vector2i::zero();
-    eventManager.prevMousePos = Vector2i::zero();
-    memset(eventManager.prevKeys, 0, SDL_NUM_SCANCODES * sizeof(Uint8));
-    memset(eventManager.currKeys, 0, SDL_NUM_SCANCODES * sizeof(Uint8));
-    return eventManager;
-}
-*/
-
 void InputManager::update() {
     // update keyboard state
     memcpy(prevKeys, currKeys, SDL_NUM_SCANCODES * sizeof(Uint8));
@@ -54,12 +41,12 @@ bool InputManager::isMouseExited(Uint8 button) {
     return (currMouse & SDL_BUTTON(button)) == 0 && (prevMouse & SDL_BUTTON(button)) != 0;
 }
 
-Vector2i InputManager::getMousePos() {
+mathfu::vec2i InputManager::getMousePos() {
     return currMousePos;
 }
 
-Vector2i InputManager::getRelMousePos() {
-    Vector2i pos;
+mathfu::vec2i InputManager::getRelMousePos() {
+    mathfu::vec2i pos;
     SDL_GetRelativeMouseState(&pos.x, &pos.y);
     return pos;
 }

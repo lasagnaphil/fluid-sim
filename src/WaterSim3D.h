@@ -52,7 +52,7 @@ struct WaterSim3D {
 
     void updateCells();
 
-    Vector3d clampPos(const Vector3d& x);
+    mathfu::vec3d clampPos(mathfu::vec3d x);
 };
 
 #endif //FLUID_SIM_WATERSIM_H

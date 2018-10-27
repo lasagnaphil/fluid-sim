@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <glad/glad.h>
 #include <StackVec.h>
-#include "HandmadeMath.h"
 
 #include "Shader.h"
 #include "WaterSimSettings.h"
@@ -39,10 +38,10 @@ class WaterRenderer3D {
     GLuint voxelVertexVBO;
     GLuint cellOffsetVBO;
 
-    hmm_vec3 vertices[LINE_VERTEX_COUNT];
-    hmm_vec4 vertexColors[LINE_VERTEX_COUNT];
+    mathfu::vec3_packed vertices[LINE_VERTEX_COUNT];
+    mathfu::vec4_packed vertexColors[LINE_VERTEX_COUNT];
     float cubeVertices[3*36];
-    StackVec<hmm_vec3, LINE_VERTEX_COUNT> waterVoxelLocations = {};
+    StackVec<mathfu::vec3_packed, LINE_VERTEX_COUNT> waterVoxelLocations = {};
 
     Shader lineShader;
     Shader voxelShader;

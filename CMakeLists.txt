@@ -59,6 +59,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
 set(EIGEN_DIR deps/eigen-3.3.5)
 target_include_directories(${PROJECT_NAME} PRIVATE ${EIGEN_DIR})
 
-# Handmade Math
-set(HMM_DIR deps/HandmadeMath)
-target_include_directories(${PROJECT_NAME} PRIVATE ${HMM_DIR})
+# mathfu
+set(MATHFU_DIR deps/mathfu/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${MATHFU_DIR})

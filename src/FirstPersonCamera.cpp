@@ -50,12 +50,12 @@ void FirstPersonCamera::update(float dt) {
     // Mouse movement
     if (mouseMovementEnabled) {
         auto mouseOffsetI = inputMgr->getRelMousePos();
-        hmm_vec2 mouseOffset = HMM_Vec2(mouseOffsetI.x, mouseOffsetI.y);
+        vec2 mouseOffset = vec2(mouseOffsetI.x, mouseOffsetI.y);
 
         mouseOffset *= mouseSensitivity;
 
-        yaw += mouseOffset.X;
-        pitch += mouseOffset.Y;
+        yaw += mouseOffset.x;
+        pitch += mouseOffset.y;
 
         if (constrainPitch) {
             if (pitch > 89.0f) pitch = 89.0f;
@@ -111,9 +111,9 @@ void FirstPersonCamera::update(float dt) {
 }
 
 void FirstPersonCamera::updateCameraVectors() {
-    hmm_quaternion quatX = HMM_QuaternionFromAxisAngle(HMM_Vec3(0.0f, 1.0f, 0.0f), -HMM_ToRadians(yaw));
-    hmm_quaternion quatY = HMM_QuaternionFromAxisAngle(HMM_Vec3(1.0f, 0.0f, 0.0f), -HMM_ToRadians(pitch));
-    transform.rot = HMM_NormalizeQuaternion(quatX * quatY);
+    quat quatX = quat::FromAngleAxis(-M_PI / 180.f * yaw, vec3(0.0f, 1.0f, 0.0f));
+    quat quatY = quat::FromAngleAxis(-M_PI / 180.f * pitch, vec3(1.0f, 0.0f, 0.0f));
+    transform.rot = (quatX * quatY).Normalized();
 }
 
 FirstPersonCamera::Config FirstPersonCamera::exportConfig() {
@@ -135,21 +135,21 @@ void FirstPersonCamera::importConfig(FirstPersonCamera::Config &data) {
     transform = data.transform;
 }
 
-hmm_mat4 FirstPersonCamera::getViewMatrix() const {
-    hmm_mat4 view = HMM_LookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
+mat4 FirstPersonCamera::getViewMatrix() const {
+    mat4 view = mat4::LookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
     return view;
 }
 
-hmm_mat4 FirstPersonCamera::getProjMatrix() const {
-    hmm_mat4 proj = HMM_Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
+mat4 FirstPersonCamera::getProjMatrix() const {
+    mat4 proj = mat4::Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
     return proj;
 }
 
 void FirstPersonCamera::drawUI() {
     ImGui::Begin("Camera Info");
-    ImGui::Text("pos: %f %f %f", transform.pos.X, transform.pos.Y, transform.pos.Z);
-    ImGui::Text("rot: %f %f %f %f", transform.rot.X, transform.rot.Y, transform.rot.Z, transform.rot.W);
-    ImGui::Text("scale: %f %f %f", transform.scale.X, transform.scale.Y, transform.scale.Z);
+    ImGui::Text("pos: %f %f %f", transform.pos.x, transform.pos.y, transform.pos.z);
+    ImGui::Text("rot: %f %f %f %f", transform.rot[0], transform.rot[1], transform.rot[2], transform.rot[3]);
+    ImGui::Text("scale: %f %f %f", transform.scale.x, transform.scale.y, transform.scale.z);
     ImGui::Text("pitch: %f, yaw: %f", pitch, yaw);
     ImGui::End();
 }

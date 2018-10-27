@@ -6,6 +6,9 @@
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 #include "Defer.h"
+#include "log.h"
+
+using namespace mathfu;
 
 void WaterSim3D::setup() {
     mac.iterate([&](size_t i, size_t j, size_t k) {
@@ -23,8 +26,8 @@ void WaterSim3D::setup() {
     });
 }
 
-Vector3d WaterSim3D::clampPos(const Vector3d& x) {
-    Vector3d clamped;
+vec3d WaterSim3D::clampPos(vec3d x) {
+    vec3d clamped;
     clamped.x = utils::clamp<double>(x.x, 0.0, SIZEX);
     clamped.y = utils::clamp<double>(x.y, 0.0, SIZEY);
     clamped.z = utils::clamp<double>(x.z, 0.0, SIZEZ);
@@ -68,7 +71,7 @@ void WaterSim3D::debugPrint() {
     for (size_t i = 0; i < SIZEX; i++) {
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t k = 0; k < SIZEZ; k++) {
-                Vector3d vec = mac.vel(i,j,k);
+                vec3d vec = mac.vel(i,j,k);
                 printf("(%10f, %10f, %10f)\n", vec.x, vec.y, vec.z);
             }
         }
@@ -77,24 +80,24 @@ void WaterSim3D::debugPrint() {
 
 void WaterSim3D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
-        Vector3d u_pos = Vector3d::create(i, (double)j + 0.5, (double)k + 0.5);
-        Vector3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
-        Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
+        vec3d u_pos = vec3d(i, (double)j + 0.5, (double)k + 0.5);
+        vec3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
+        vec3d x_mid_cl = clampPos(x_mid);
+        vec3d x_p = u_pos - dt * mac.velInterp(x_mid_cl);
         mac.u(i,j,k) = mac.velInterpU(x_p);
     });
     mac.iterateV([&](size_t i, size_t j, size_t k) {
-        Vector3d v_pos = Vector3d::create((double)i + 0.5, j, (double)k + 0.5);
-        Vector3d x_mid = v_pos - 0.5 * dt * mac.velV(i, j, k);
-        Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
+        vec3d v_pos = vec3d((double)i + 0.5, j, (double)k + 0.5);
+        vec3d x_mid = v_pos - 0.5 * dt * mac.velV(i, j, k);
+        vec3d x_mid_cl = clampPos(x_mid);
+        vec3d x_p = v_pos - dt * mac.velInterp(x_mid_cl);
         mac.v(i,j,k) = mac.velInterpV(x_p);
     });
     mac.iterateW([&](size_t i, size_t j, size_t k) {
-        Vector3d w_pos = Vector3d::create((double)i + 0.5, (double)j + 0.5, k);
-        Vector3d x_mid = w_pos - 0.5 * dt * mac.velW(i, j, k);
-        Vector3d x_mid_cl = clampPos(x_mid);
-        Vector3d x_p = w_pos - dt * mac.velInterp(x_mid_cl);
+        vec3d w_pos = vec3d((double)i + 0.5, (double)j + 0.5, k);
+        vec3d x_mid = w_pos - 0.5 * dt * mac.velW(i, j, k);
+        vec3d x_mid_cl = clampPos(x_mid);
+        vec3d x_p = w_pos - dt * mac.velInterp(x_mid_cl);
         mac.w(i,j,k) = mac.velInterpW(x_p);
     });
 }
@@ -331,15 +334,15 @@ void WaterSim3D::updateCells() {
     });
     mac.iterate([&](size_t i, size_t j, size_t k) {
         if ((*oldCell)(i,j,k) == CellType::FLUID) {
-            Vector3d particles[8];
-            particles[0] = Vector3d::create((double)i + randf(), (double)j + randf(), (double)k + randf());
-            particles[1] = Vector3d::create((double)i + 0.5 + randf(), (double)j + randf(), (double)k + randf());
-            particles[2] = Vector3d::create((double)i + randf(), (double)j + 0.5 + randf(), (double)k + randf());
-            particles[3] = Vector3d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + randf());
-            particles[4] = Vector3d::create((double)i + randf(), (double)j + randf(), (double)k + 0.5 + randf());
-            particles[5] = Vector3d::create((double)i + 0.5 + randf(), (double)j + randf(), (double)k + 0.5 + randf());
-            particles[6] = Vector3d::create((double)i + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
-            particles[7] = Vector3d::create((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
+            vec3d particles[8];
+            particles[0] = vec3d((double)i + randf(), (double)j + randf(), (double)k + randf());
+            particles[1] = vec3d((double)i + 0.5 + randf(), (double)j + randf(), (double)k + randf());
+            particles[2] = vec3d((double)i + randf(), (double)j + 0.5 + randf(), (double)k + randf());
+            particles[3] = vec3d((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + randf());
+            particles[4] = vec3d((double)i + randf(), (double)j + randf(), (double)k + 0.5 + randf());
+            particles[5] = vec3d((double)i + 0.5 + randf(), (double)j + randf(), (double)k + 0.5 + randf());
+            particles[6] = vec3d((double)i + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
+            particles[7] = vec3d((double)i + 0.5 + randf(), (double)j + 0.5 + randf(), (double)k + 0.5 + randf());
             for (int l = 0; l < 8; l++) {
                 auto& pos = particles[l];
                 pos = clampPos(pos + dt * mac.velInterp(pos));

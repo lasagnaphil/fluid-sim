@@ -11,9 +11,6 @@
 #include "Defer.h"
 #include "log.h"
 
-#define HANDMADE_MATH_IMPLEMENTATION
-#include "HandmadeMath.h"
-
 #include "InputManager.h"
 
 #include "WaterSim3D.h"
@@ -139,14 +136,14 @@ void App::init(Vector2i screenSize, Mode mode) {
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
         waterRenderer2D = new WaterRenderer2D();
-        camera2d = Camera2D::create(&settings, waterSim2D->getGridCenter());
+        camera2d = Camera2D::create(&settings, vec2(waterSim2D->getGridCenter()));
         camera2d.zoom = 64.0f;
     }
     else if (mode == Mode::Dim3) {
         waterSim3D = new WaterSim3D();
         waterRenderer3D = new WaterRenderer3D();
         fpsCamera = FirstPersonCamera::create(&settings);
-        fpsCamera.transform.pos = HMM_Vec3(0.5f, 0.5f, 3.0f);
+        fpsCamera.transform.pos = vec3(0.5f, 0.5f, 3.0f);
     }
 
     if (mode == Mode::Dim2) {

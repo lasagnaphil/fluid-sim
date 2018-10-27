@@ -13,15 +13,15 @@ struct Shader;
 
 struct Camera2D {
     static Camera2D create(AppSettings* settings);
-    static Camera2D create(AppSettings* settings, hmm_vec2 pos);
+    static Camera2D create(AppSettings* settings, mathfu::vec2 pos);
 
     void addShader(Shader* shader);
 
     void update(float dt);
 
-    hmm_mat4 getViewMatrix() const;
+    mathfu::mat4 getViewMatrix() const;
 
-    hmm_mat4 getProjMatrix() const;
+    mathfu::mat4 getProjMatrix() const;
 
     void drawUI();
 
@@ -32,7 +32,7 @@ struct Camera2D {
     float pixelsPerMeter = 100.0f;
     float zoom = 1.0f;
 
-    hmm_vec2 pos;
+    mathfu::vec2 pos;
 };
 
 #endif //FLUID_SIM_CAMERA2D_H

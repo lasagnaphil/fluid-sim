@@ -9,6 +9,8 @@
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 
+using namespace mathfu;
+
 static float origCubeVertices[3*36] = {
     -0.5f, -0.5f, -0.5f,
     0.5f, -0.5f, -0.5f,
@@ -56,9 +58,9 @@ static float origCubeVertices[3*36] = {
 void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     this->sim = sim;
 
-    const auto EMPTY_COLOR = HMM_Vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    const auto FLUID_COLOR = HMM_Vec4(0.0f, 0.0f, 1.0f, 1.0f);
-    const auto SOLID_COLOR = HMM_Vec4(0.1f, 0.1f, 0.1f, 1.0f);
+    const auto EMPTY_COLOR = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    const auto FLUID_COLOR = vec4(0.0f, 0.0f, 1.0f, 1.0f);
+    const auto SOLID_COLOR = vec4(0.1f, 0.1f, 0.1f, 1.0f);
 
     lineShader = Shader::create("assets/shaders/lines.vert", "assets/shaders/lines.frag");
     voxelShader = Shader::create("assets/shaders/voxels.vert", "assets/shaders/lines.frag");
@@ -97,24 +99,24 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     glBindVertexArray(lineVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * LINE_VERTEX_COUNT, vertices, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3p) * LINE_VERTEX_COUNT, vertices, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(hmm_vec3), 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3p), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, lineTypeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec4) * LINE_VERTEX_COUNT, vertexColors, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec4p) * LINE_VERTEX_COUNT, vertexColors, GL_STATIC_DRAW);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(hmm_vec4), 0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(vec4p), 0);
 
     glBindVertexArray(pointVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2*sizeof(hmm_vec3), 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 2*sizeof(vec3p), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, lineTypeVBO);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 2*sizeof(hmm_vec4), 0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 2*sizeof(vec4p), 0);
 
     glBindVertexArray(voxelVAO);
 
@@ -124,15 +126,15 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, cellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hmm_vec3) * SIZEX*SIZEY*SIZEZ, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3p) * SIZEX*SIZEY*SIZEZ, waterVoxelLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(hmm_vec3), 0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vec3d), 0);
     glVertexAttribDivisor(1, 1);
 
     glBindVertexArray(0);
 
     lineShader.use();
-    lineShader.setMatrix4("model", HMM_Mat4d(1.0));
+    lineShader.setMatrix4("model", mat4(1.0));
     camera->addShader(&lineShader);
     camera->addShader(&voxelShader);
 }
@@ -155,23 +157,23 @@ void WaterRenderer3D::update() {
     if (!sim->rendered) {
         if (drawMode == DrawMode::POINT || drawMode == DrawMode::LINE) {
             sim->mac.iterate([&](size_t i, size_t j, size_t k) {
-                Vector3d dir_d = sim->mac.vel(i, j, k);
-                hmm_vec3 dir = HMM_Vec3((float)dir_d.x, (float)dir_d.x, (float)dir_d.x);
+                vec3d dir_d = sim->mac.vel(i, j, k);
+                vec3 dir = vec3((float)dir_d.x, (float)dir_d.x, (float)dir_d.x);
                 vertices[2 * (k * SIZEY * SIZEX + j * SIZEX + i)]
-                        = CELL_SIZE * HMM_Vec3(i, j, k);
+                        = CELL_SIZE * vec3(i, j, k);
                 vertices[2 * (k * SIZEY * SIZEX + j * SIZEX + i) + 1]
-                        = CELL_SIZE * HMM_Vec3(i, j, k) + VEL_LINE_SCALE * dir;
+                        = CELL_SIZE * vec3(i, j, k) + VEL_LINE_SCALE * dir;
             });
             glBindVertexArray(lineVAO);
             glBindBuffer(GL_ARRAY_BUFFER, lineVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec3) * LINE_VERTEX_COUNT, vertices);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3d) * LINE_VERTEX_COUNT, vertices);
             glBindVertexArray(0);
         }
         else if (drawMode == DrawMode::VOXEL) {
             updateWaterVoxelLocations();
             glBindVertexArray(voxelVAO);
             glBindBuffer(GL_ARRAY_BUFFER, cellOffsetVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(hmm_vec3) * waterVoxelLocations.size, waterVoxelLocations.data);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec3d) * waterVoxelLocations.size, waterVoxelLocations.data);
             glBindVertexArray(0);
         }
         sim->rendered = true;
@@ -198,7 +200,6 @@ void WaterRenderer3D::draw() {
 }
 
 void WaterRenderer3D::drawUI() {
-    if (ENABLE_DEBUG_UI) {
     static size_t curr_k = 0;
 
     ImGui::Begin("Simulation Data");
@@ -235,7 +236,7 @@ void WaterRenderer3D::drawUI() {
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t i = 0; i < SIZEX; i++) {
                 char fstr[32];
-                Vector3d v = sim->mac.vel(i, SIZEY - 1 - j, curr_k);
+                vec3d v = sim->mac.vel(i, SIZEY - 1 - j, curr_k);
                 sprintf(fstr, "%2.2f %2.2f %2.2f", v.x, v.y, v.z);
                 ImGui::Text(fstr);
                 ImGui::NextColumn();
@@ -246,7 +247,6 @@ void WaterRenderer3D::drawUI() {
         ImGui::Separator();
     }
     ImGui::End();
-    }
 }
 
 void WaterRenderer3D::updateWaterVoxelLocations() {
@@ -254,7 +254,7 @@ void WaterRenderer3D::updateWaterVoxelLocations() {
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
         WaterSim3D::CellType cellType = sim->cell(i, j, k);
         if (cellType == WaterSim3D::CellType::FLUID) {
-            waterVoxelLocations.push(CELL_SIZE*HMM_Vec3(i, j, k));
+            waterVoxelLocations.push(vec3p(i*CELL_SIZE, j*CELL_SIZE, k*CELL_SIZE));
         }
     });
 }

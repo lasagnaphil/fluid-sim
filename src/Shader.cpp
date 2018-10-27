@@ -6,6 +6,8 @@
 #include "Shader.h"
 #include "log.h"
 
+using namespace mathfu;
+
 GLuint compile_shader(GLenum type, const GLchar *source) {
     GLuint shader = glCreateShader(type);
 
@@ -80,20 +82,20 @@ void Shader::setFloat(const char* name, float value) {
     glUniform1f(glGetUniformLocation(id, name), value);
 }
 
-void Shader::setMatrix4(const char *name, const hmm_mat4& value) {
-    glUniformMatrix4fv(glGetUniformLocation(id, name), 1, GL_FALSE, (const GLfloat*) value.Elements);
+void Shader::setMatrix4(const char *name, const mat4& value) {
+    glUniformMatrix4fv(glGetUniformLocation(id, name), 1, GL_FALSE, (const GLfloat*) &value);
 }
 
-void Shader::setVector2(const char *name, const hmm_vec2& value) {
-    glUniform2fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.Elements);
+void Shader::setVector2(const char *name, const vec2& value) {
+    glUniform2fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
 }
 
-void Shader::setVector3(const char* name, const hmm_vec3& value) {
-    glUniform3fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.Elements);
+void Shader::setVector3(const char* name, const vec3& value) {
+    glUniform3fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
 }
 
-void Shader::setVector4(const char *name, const hmm_vec4& value) {
-    glUniform4fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.Elements);
+void Shader::setVector4(const char *name, const vec4& value) {
+    glUniform4fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
 }
 
 void Shader::deserialize(json::Value json) {
