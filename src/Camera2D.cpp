@@ -48,12 +48,9 @@ void Camera2D::update(float dt) {
 }
 
 mat4f Camera2D::getViewMatrix() const {
-    return mat4f::Transform(vec3f(-pos.x, -pos.y, 0), mat3f::Identity(), vec3f(zoom, zoom, 1));
-    /*
-    mat4 mat = HMM_Translate(HMM_Vec3(-pos.x, -pos.y, 0));
-    mat = HMM_Scale(HMM_Vec3(zoom, zoom, 1)) * mat;
+    mat4f mat = mat4f::FromTranslationVector(vec3f(-pos.x, -pos.y, 0));
+    mat = mat4f::FromScaleVector(vec3f(zoom, zoom, 1)) * mat;
     return mat;
-     */
 }
 
 mat4f Camera2D::getProjMatrix() const {
