@@ -58,9 +58,9 @@ public:
 
     void importConfig(Config &data);
 
-    mathfu::mat4 getViewMatrix() const;
+    mathfu::mat4f getViewMatrix() const;
 
-    mathfu::mat4 getProjMatrix() const;
+    mathfu::mat4f getProjMatrix() const;
 
     void drawUI();
 

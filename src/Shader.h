@@ -21,10 +21,10 @@ struct Shader {
     void setBool(const char* name, bool value);
     void setInt(const char* name, int value);
     void setFloat(const char* name, float value);
-    void setMatrix4(const char* name, const mathfu::mat4& value);
-    void setVector2(const char* name, const mathfu::vec2& value);
-    void setVector3(const char* name, const mathfu::vec3& value);
-    void setVector4(const char* name, const mathfu::vec4& value);
+    void setMatrix4(const char* name, const mathfu::mat4f& value);
+    void setVector2(const char* name, const mathfu::vec2f& value);
+    void setVector3(const char* name, const mathfu::vec3f& value);
+    void setVector4(const char* name, const mathfu::vec4f& value);
 
     void deserialize(json::Value json);
     json::Value serialize();

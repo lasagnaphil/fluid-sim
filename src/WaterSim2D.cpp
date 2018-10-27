@@ -5,6 +5,7 @@
 #include <Defer.h>
 #include <ctime>
 #include <math/Utils.h>
+#include <log.h>
 #include "WaterSim2D.h"
 #include "InputManager.h"
 

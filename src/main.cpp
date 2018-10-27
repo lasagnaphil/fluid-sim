@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[]) {
     App app;
-    app.init(Vector2i::create(1600, 900), App::Mode::Dim2);
+    app.init(mathfu::vec2i(1600, 900), App::Mode::Dim2);
     app.start();
     app.free();
     return 0;

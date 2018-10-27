@@ -17,13 +17,13 @@
 
 using namespace mathfu;
 
-static vec2p origQuadVertices[6] = {
-        vec2p(0.0f, 0.0f),
-        vec2p(0.0f, 1.0f),
-        vec2p(1.0f, 1.0f),
-        vec2p(0.0f, 0.0f),
-        vec2p(1.0f, 1.0f),
-        vec2p(1.0f, 0.0f),
+static vec2fp origQuadVertices[6] = {
+        vec2fp(0.0f, 0.0f),
+        vec2fp(0.0f, 1.0f),
+        vec2fp(1.0f, 1.0f),
+        vec2fp(0.0f, 0.0f),
+        vec2fp(1.0f, 1.0f),
+        vec2fp(1.0f, 0.0f),
 };
 
 class WaterRenderer2D {
@@ -46,15 +46,15 @@ private:
     GLuint phiCellValueVBO;
     GLuint particleVBO;
 
-    vec2p quadVertices[6];
-    StackVec<vec2p, SIZEX*SIZEY> waterCellLocations = {};
-    StackVec<vec2p, SIZEX*SIZEY> solidCellLocations = {};
-    StackVec<vec2p, SIZEX*SIZEY> pressureCellLocations = {};
+    vec2fp quadVertices[6];
+    StackVec<vec2fp, SIZEX*SIZEY> waterCellLocations = {};
+    StackVec<vec2fp, SIZEX*SIZEY> solidCellLocations = {};
+    StackVec<vec2fp, SIZEX*SIZEY> pressureCellLocations = {};
     StackVec<float, SIZEX*SIZEY> pressureCellValues = {};
-    StackVec<vec2p, SIZEX*SIZEY> allCellLocations = {};
+    StackVec<vec2fp, SIZEX*SIZEY> allCellLocations = {};
     StackVec<float, SIZEX*SIZEY> phiCellValues = {};
 
-    StackVec<vec2p, 8*SIZEX*SIZEY> particleLocations = {};
+    StackVec<vec2fp, 8*SIZEX*SIZEY> particleLocations = {};
 
     Shader cellShader;
     Shader particleShader;
@@ -139,9 +139,9 @@ public:
     void setup(WaterSim2D* sim, Camera2D* camera) {
         this->sim = sim;
 
-        const auto EMPTY_COLOR = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-        const auto FLUID_COLOR = vec4(0.0f, 0.0f, 1.0f, 1.0f);
-        const auto SOLID_COLOR = vec4(0.1f, 0.1f, 0.1f, 1.0f);
+        const auto EMPTY_COLOR = vec4f(0.0f, 0.0f, 0.0f, 1.0f);
+        const auto FLUID_COLOR = vec4f(0.0f, 0.0f, 1.0f, 1.0f);
+        const auto SOLID_COLOR = vec4f(0.1f, 0.1f, 0.1f, 1.0f);
 
         cellShader = Shader::fromStr(cellVS, cellFS);
         particleShader = Shader::fromStr(particleVS, cellFS);
@@ -155,7 +155,7 @@ public:
 
         allCellLocations.size = SIZEX*SIZEY;
         sim->iterate([&](size_t i, size_t j) {
-            allCellLocations[j*SIZEX + i] = vec2(i,j) * (float)sim->dx;
+            allCellLocations[j*SIZEX + i] = vec2f(i,j) * (float)sim->dx;
         });
 
         updateBuffers();
@@ -177,38 +177,38 @@ public:
         glBindVertexArray(waterCellVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * 6, quadVertices, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 6, quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
         glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * SIZEX*SIZEY, waterCellLocations.data, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * SIZEX*SIZEY, waterCellLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
         glVertexAttribDivisor(1, 1);
 
         glBindVertexArray(solidCellVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
         glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * SIZEX*SIZEY, solidCellLocations.data, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * SIZEX*SIZEY, solidCellLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
         glVertexAttribDivisor(1, 1);
 
         glBindVertexArray(pressureCellVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
         glBindBuffer(GL_ARRAY_BUFFER, pressureCellOffsetVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * SIZEX*SIZEY, pressureCellLocations.data, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * SIZEX*SIZEY, pressureCellLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
         glVertexAttribDivisor(1, 1);
 
         glBindBuffer(GL_ARRAY_BUFFER, pressureCellValueVBO);
@@ -221,12 +221,12 @@ public:
 
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
         glBindBuffer(GL_ARRAY_BUFFER, allCellOffsetVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * SIZEX*SIZEY, allCellLocations.data, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * SIZEX*SIZEY, allCellLocations.data, GL_STATIC_DRAW);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
         glVertexAttribDivisor(1, 1);
 
         glBindBuffer(GL_ARRAY_BUFFER, phiCellValueVBO);
@@ -238,9 +238,9 @@ public:
         glBindVertexArray(particleVAO);
 
         glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2p) * 8*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2p), 0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
         glBindVertexArray(0);
 
@@ -255,16 +255,16 @@ public:
             if (renderCells) {
                 glBindVertexArray(waterCellVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2p) * waterCellLocations.size, waterCellLocations.data);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * waterCellLocations.size, waterCellLocations.data);
                 glBindVertexArray(solidCellVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2p) * solidCellLocations.size, solidCellLocations.data);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * solidCellLocations.size, solidCellLocations.data);
                 glBindVertexArray(0);
             }
             if (renderPressures) {
                 glBindVertexArray(pressureCellVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, pressureCellOffsetVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2p) * pressureCellLocations.size, pressureCellLocations.data);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * pressureCellLocations.size, pressureCellLocations.data);
                 glBindVertexArray(particleVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, pressureCellValueVBO);
                 glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * pressureCellValues.size, pressureCellValues.data);
@@ -273,7 +273,7 @@ public:
             if (renderParticles) {
                 glBindVertexArray(particleVAO);
                 glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2p) * particleLocations.size, particleLocations.data);
+                glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * particleLocations.size, particleLocations.data);
                 glBindVertexArray(0);
             }
             if (renderLevelSet) {
@@ -288,18 +288,18 @@ public:
     void draw() {
         if (renderCells) {
             cellShader.use();
-            cellShader.setVector4("uniColor", vec4(0.0f, 0.0f, 1.0f, 1.0f));
+            cellShader.setVector4("uniColor", vec4f(0.0f, 0.0f, 1.0f, 1.0f));
             glBindVertexArray(waterCellVAO);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, waterCellLocations.size);
-            cellShader.setVector4("uniColor", vec4(0.5f, 0.5f, 0.5f, 1.0f));
+            cellShader.setVector4("uniColor", vec4f(0.5f, 0.5f, 0.5f, 1.0f));
             glBindVertexArray(solidCellVAO);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, solidCellLocations.size);
             glBindVertexArray(0);
         }
         if (renderPressures) {
             cellFieldShader.use();
-            cellFieldShader.setVector4("posColor", vec4(1.0f, 0.0f, 0.0f, 1.0f));
-            cellFieldShader.setVector4("negColor", vec4(0.0f, 0.0f, 1.0f, 1.0f));
+            cellFieldShader.setVector4("posColor", vec4f(1.0f, 0.0f, 0.0f, 1.0f));
+            cellFieldShader.setVector4("negColor", vec4f(0.0f, 0.0f, 1.0f, 1.0f));
             glBindVertexArray(pressureCellVAO);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, pressureCellLocations.size);
             glBindVertexArray(0);
@@ -314,8 +314,8 @@ public:
 
         if (renderLevelSet) {
             cellFieldShader.use();
-            cellFieldShader.setVector4("posColor", vec4(1.0f, 0.0f, 0.0f, 1.0f));
-            cellFieldShader.setVector4("negColor", vec4(0.0f, 0.0f, 1.0f, 1.0f));
+            cellFieldShader.setVector4("posColor", vec4f(1.0f, 0.0f, 0.0f, 1.0f));
+            cellFieldShader.setVector4("negColor", vec4f(0.0f, 0.0f, 1.0f, 1.0f));
             glBindVertexArray(phiCellVAO);
             glDrawArraysInstanced(GL_TRIANGLES, 0, 6, allCellLocations.size);
             glBindVertexArray(0);
@@ -337,8 +337,8 @@ public:
         ImGui::End();
     }
 
-    mathfu::vec2 double_to_float(Vector2d vec) {
-        return mathfu::vec2((float)vec.x,(float)vec.y);
+    mathfu::vec2f double_to_float(mathfu::vec2f vec) {
+        return mathfu::vec2f((float)vec.x,(float)vec.y);
     }
 
     static constexpr float VEL_SIZE = 0.01f;
@@ -350,10 +350,10 @@ public:
             sim->iterate([&](size_t i, size_t j) {
                 WaterSim2D::CellType cellType = sim->cell(i,j);
                 if (cellType == WaterSim2D::CellType::FLUID) {
-                    waterCellLocations.push(vec2p(i * sim->dx, j * sim->dx));
+                    waterCellLocations.push(vec2fp(i * sim->dx, j * sim->dx));
                 }
                 else if (cellType == WaterSim2D::CellType::SOLID) {
-                    solidCellLocations.push(vec2p(i * sim->dx, j * sim->dx));
+                    solidCellLocations.push(vec2fp(i * sim->dx, j * sim->dx));
                 }
             });
         }
@@ -362,7 +362,7 @@ public:
             pressureCellValues.size = 0;
             sim->iterate([&](size_t i, size_t j) {
                 if (sim->p(i,j) != 0) {
-                    pressureCellLocations.push(vec2p(i * sim->dx, j * sim->dx));
+                    pressureCellLocations.push(vec2fp(i * sim->dx, j * sim->dx));
                     float p = (float)sim->p(i,j);
                     pressureCellValues.push(utils::sigmoid(0.01f * p));
                 }

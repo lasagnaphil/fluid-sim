@@ -8,7 +8,7 @@
 
 using namespace mathfu;
 
-Camera2D Camera2D::create(AppSettings* settings, vec2 pos) {
+Camera2D Camera2D::create(AppSettings* settings, vec2f pos) {
     Camera2D cam;
     cam.settings = settings;
     cam.pos = pos;
@@ -47,8 +47,8 @@ void Camera2D::update(float dt) {
     })
 }
 
-mat4 Camera2D::getViewMatrix() const {
-    return mat4::Transform(vec3(-pos.x, -pos.y, 0), mat3::Identity(), vec3(zoom, zoom, 1));
+mat4f Camera2D::getViewMatrix() const {
+    return mat4f::Transform(vec3f(-pos.x, -pos.y, 0), mat3f::Identity(), vec3f(zoom, zoom, 1));
     /*
     mat4 mat = HMM_Translate(HMM_Vec3(-pos.x, -pos.y, 0));
     mat = HMM_Scale(HMM_Vec3(zoom, zoom, 1)) * mat;
@@ -56,10 +56,10 @@ mat4 Camera2D::getViewMatrix() const {
      */
 }
 
-mat4 Camera2D::getProjMatrix() const {
+mat4f Camera2D::getProjMatrix() const {
     float screenWidth = (float)settings->screenSize.x / pixelsPerMeter;
     float screenHeight = (float)settings->screenSize.y / pixelsPerMeter;
-    return mat4::Ortho(-screenWidth/2, screenWidth/2,
+    return mat4f::Ortho(-screenWidth/2, screenWidth/2,
                             -screenHeight/2, screenHeight/2,
                             -1.0f, 1.0f);
 }

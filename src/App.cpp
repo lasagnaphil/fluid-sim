@@ -62,7 +62,7 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id, GLenum severi
     }
 }
 
-void App::init(Vector2i screenSize, Mode mode) {
+void App::init(mathfu::vec2i screenSize, Mode mode) {
     settings.screenSize = screenSize;
     this->mode = mode;
 
@@ -136,14 +136,14 @@ void App::init(Vector2i screenSize, Mode mode) {
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
         waterRenderer2D = new WaterRenderer2D();
-        camera2d = Camera2D::create(&settings, vec2(waterSim2D->getGridCenter()));
+        camera2d = Camera2D::create(&settings, vec2f(waterSim2D->getGridCenter()));
         camera2d.zoom = 64.0f;
     }
     else if (mode == Mode::Dim3) {
         waterSim3D = new WaterSim3D();
         waterRenderer3D = new WaterRenderer3D();
         fpsCamera = FirstPersonCamera::create(&settings);
-        fpsCamera.transform.pos = vec3(0.5f, 0.5f, 3.0f);
+        fpsCamera.transform.pos = vec3f(0.5f, 0.5f, 3.0f);
     }
 
     if (mode == Mode::Dim2) {

@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <cmath>
 #include <mathfu/glsl_mappings.h>
-#include <math/Vector2.h>
 #include <math/Utils.h>
 #include "Array2D.h"
 

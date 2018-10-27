@@ -50,7 +50,7 @@ void FirstPersonCamera::update(float dt) {
     // Mouse movement
     if (mouseMovementEnabled) {
         auto mouseOffsetI = inputMgr->getRelMousePos();
-        vec2 mouseOffset = vec2(mouseOffsetI.x, mouseOffsetI.y);
+        vec2f mouseOffset = vec2f(mouseOffsetI.x, mouseOffsetI.y);
 
         mouseOffset *= mouseSensitivity;
 
@@ -111,8 +111,8 @@ void FirstPersonCamera::update(float dt) {
 }
 
 void FirstPersonCamera::updateCameraVectors() {
-    quat quatX = quat::FromAngleAxis(-M_PI / 180.f * yaw, vec3(0.0f, 1.0f, 0.0f));
-    quat quatY = quat::FromAngleAxis(-M_PI / 180.f * pitch, vec3(1.0f, 0.0f, 0.0f));
+    quat quatX = quat::FromAngleAxis(-M_PI / 180.f * yaw, vec3f(0.0f, 1.0f, 0.0f));
+    quat quatY = quat::FromAngleAxis(-M_PI / 180.f * pitch, vec3f(1.0f, 0.0f, 0.0f));
     transform.rot = (quatX * quatY).Normalized();
 }
 
@@ -135,13 +135,13 @@ void FirstPersonCamera::importConfig(FirstPersonCamera::Config &data) {
     transform = data.transform;
 }
 
-mat4 FirstPersonCamera::getViewMatrix() const {
-    mat4 view = mat4::LookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
+mat4f FirstPersonCamera::getViewMatrix() const {
+    mat4f view = mat4f::LookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
     return view;
 }
 
-mat4 FirstPersonCamera::getProjMatrix() const {
-    mat4 proj = mat4::Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
+mat4f FirstPersonCamera::getProjMatrix() const {
+    mat4f proj = mat4f::Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
     return proj;
 }
 

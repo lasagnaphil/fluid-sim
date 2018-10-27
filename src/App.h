@@ -5,7 +5,6 @@
 #ifndef FLUID_SIM_APP_H
 #define FLUID_SIM_APP_H
 
-#include <math/Vector2.h>
 #include <SDL.h>
 
 #include "FirstPersonCamera.h"
@@ -14,7 +13,7 @@
 #include "WaterRenderer3D.h"
 
 struct AppSettings {
-    Vector2i screenSize = {800, 600};
+    mathfu::vec2i screenSize = {800, 600};
 };
 
 struct App {
@@ -23,7 +22,7 @@ struct App {
     };
     static constexpr int MAX_SHADERS = 16;
 
-    void init(Vector2i screenSize, Mode mode);
+    void init(mathfu::vec2i screenSize, Mode mode);
     void free();
     void start();
 
