@@ -147,7 +147,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
     }
 
     if (mode == Mode::Dim2) {
-        waterSim2D->setup();
+        waterSim2D->setup(0.001, 0.001, 997.0, -9.81);
         waterRenderer2D->setup(waterSim2D, &camera2d);
     }
     else if (mode == Mode::Dim3) {

@@ -3,6 +3,7 @@
 //
 
 #include "Camera2D.h"
+#include "imgui.h"
 #include "Shader.h"
 #include "App.h"
 

@@ -30,22 +30,22 @@ struct WaterSim2D {
     Vec<mathfu::vec2d> particles = {};
     Array2D<double, SIZEX, SIZEY> phi = {};
 
-    const double gravity = -9.81;
-    const double rho = 997.0;
+    double gravity = -9.81;
+    double rho = 997.0;
 
     bool rendered = false;
     double currentTime = 0.0f;
 
-    const double dt = 0.001;
-    const double dx = 0.001;
-    const double dr = 0.0009; // water particle radius
+    double dt = 0.0001;
+    double dx = 0.001;
+    double dr = 0.0009; // water particle radius
 
     enum class StageType {
         Init, CreateLevelSet, UpdateLevelSet, ApplyAdvection, ApplyGravity, ApplyProjection, UpdateCells
     };
     StageType stage;
 
-    void setup();
+    void setup(double dt, double dx, double rho, double gravity);
 
     void runFrame();
 

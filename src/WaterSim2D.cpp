@@ -15,8 +15,13 @@ inline double randf() {
     return ((double)rand()/(double)RAND_MAX) * 0.5;
 }
 
-void WaterSim2D::setup() {
-    mac.dx = dx;
+void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
+    this->dt = dt;
+    this->dx = mac.dx = dx;
+    this->dr = dx * 0.9;
+    this->rho = rho;
+    this->gravity = gravity;
+
     size_t fluidCount = 0;
     iterate([&](size_t i, size_t j) {
         if (i == 0 || i == SIZEX - 1 ||
@@ -308,7 +313,7 @@ void WaterSim2D::applyProjection() {
         double alpha = sigma / z.innerProduct(s);
         p.setMultiplyAdd(p, alpha, s);
         r.setMultiplyAdd(r, -alpha, z);
-        if (r.infiniteNorm() <= 1e-6) { break; }
+        if (r.infiniteNorm() <= 1e-6 * rhs.infiniteNorm()) { break; }
 
         applyPreconditioner();
 

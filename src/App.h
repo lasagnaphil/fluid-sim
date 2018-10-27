@@ -9,8 +9,11 @@
 
 #include "FirstPersonCamera.h"
 #include "Camera2D.h"
-#include "WaterRenderer2D.h"
-#include "WaterRenderer3D.h"
+
+struct WaterSim2D;
+struct WaterRenderer2D;
+struct WaterSim3D;
+struct WaterRenderer3D;
 
 struct AppSettings {
     mathfu::vec2i screenSize = {800, 600};

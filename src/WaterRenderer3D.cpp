@@ -254,7 +254,7 @@ void WaterRenderer3D::updateWaterVoxelLocations() {
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
         WaterSim3D::CellType cellType = sim->cell(i, j, k);
         if (cellType == WaterSim3D::CellType::FLUID) {
-            waterVoxelLocations.push(vec3fp(i*CELL_SIZE, j*CELL_SIZE, k*CELL_SIZE));
+            waterVoxelLocations.push(vec3fp(vec3f(i*CELL_SIZE, j*CELL_SIZE, k*CELL_SIZE)));
         }
     });
 }

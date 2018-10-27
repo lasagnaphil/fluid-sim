@@ -9,6 +9,8 @@
 #include "InputManager.h"
 #include "Shader.h"
 
+using namespace mathfu;
+
 FirstPersonCamera FirstPersonCamera::create(AppSettings* settings, float yaw, float pitch)
 {
     FirstPersonCamera cam;

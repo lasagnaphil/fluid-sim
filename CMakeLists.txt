@@ -2,9 +2,16 @@ cmake_minimum_required(VERSION 3.11)
 set(PROJECT_NAME fluid_sim)
 project(${PROJECT_NAME})
 
+find_program(CCACHE_FOUND ccache)
+if(CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+endif(CCACHE_FOUND)
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
 
 file(GLOB_RECURSE PROJECT_SOURCES src/*.cpp)
 file(GLOB_RECURSE PROJECT_HEADERS src/*.h)
@@ -54,10 +61,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 # STB
 set(STB_DIR deps/stb)
 target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
-
-# Eigen
-set(EIGEN_DIR deps/eigen-3.3.5)
-target_include_directories(${PROJECT_NAME} PRIVATE ${EIGEN_DIR})
 
 # mathfu
 set(MATHFU_DIR deps/mathfu/include)
