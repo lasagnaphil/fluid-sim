@@ -7,8 +7,6 @@
 #include "Shader.h"
 #include "App.h"
 
-using namespace mathfu;
-
 Camera2D Camera2D::create(AppSettings* settings, vec2f pos) {
     Camera2D cam;
     cam.settings = settings;
@@ -49,15 +47,15 @@ void Camera2D::update(float dt) {
 }
 
 mat4f Camera2D::getViewMatrix() const {
-    mat4f mat = mat4f::FromTranslationVector(vec3f(-pos.x, -pos.y, 0));
-    mat = mat4f::FromScaleVector(vec3f(zoom, zoom, 1)) * mat;
+    mat4f mat = aml::transMat(vec3f{-pos.x, -pos.y, 0});
+    mat = aml::scaleMat(vec3f{zoom, zoom, 1}) * mat;
     return mat;
 }
 
 mat4f Camera2D::getProjMatrix() const {
     float screenWidth = (float)settings->screenSize.x / pixelsPerMeter;
     float screenHeight = (float)settings->screenSize.y / pixelsPerMeter;
-    return mat4f::Ortho(-screenWidth/2, screenWidth/2,
+    return aml::ortho(-screenWidth/2, screenWidth/2,
                             -screenHeight/2, screenHeight/2,
                             -1.0f, 1.0f);
 }

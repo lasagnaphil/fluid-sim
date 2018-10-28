@@ -6,7 +6,7 @@
 #define THESYSTEM_INPUTMANAGER_H
 
 #include <SDL_events.h>
-#include <mathfu/glsl_mappings.h>
+#include "vec2.h"
 #include "Vec.h"
 #include "Map.h"
 
@@ -16,8 +16,8 @@ struct InputManager {
 
     Uint32 currMouse = {};
     Uint32 prevMouse = {};
-    mathfu::vec2i currMousePos = {};
-    mathfu::vec2i prevMousePos = {};
+    vec2i currMousePos = {};
+    vec2i prevMousePos = {};
 
     static InputManager inst;
     static InputManager* get() {
@@ -34,8 +34,8 @@ struct InputManager {
     bool isMouseEntered(Uint8 button);
     bool isMouseExited(Uint8 button);
 
-    mathfu::vec2i getMousePos();
-    mathfu::vec2i getRelMousePos();
+    vec2i getMousePos();
+    vec2i getRelMousePos();
 };
 
 #endif //THESYSTEM_INPUTMANAGER_H

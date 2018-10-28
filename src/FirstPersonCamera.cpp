@@ -9,8 +9,6 @@
 #include "InputManager.h"
 #include "Shader.h"
 
-using namespace mathfu;
-
 FirstPersonCamera FirstPersonCamera::create(AppSettings* settings, float yaw, float pitch)
 {
     FirstPersonCamera cam;
@@ -52,7 +50,7 @@ void FirstPersonCamera::update(float dt) {
     // Mouse movement
     if (mouseMovementEnabled) {
         auto mouseOffsetI = inputMgr->getRelMousePos();
-        vec2f mouseOffset = vec2f(mouseOffsetI.x, mouseOffsetI.y);
+        vec2f mouseOffset = vec2f{(float)mouseOffsetI.x, (float)mouseOffsetI.y};
 
         mouseOffset *= mouseSensitivity;
 
@@ -113,9 +111,9 @@ void FirstPersonCamera::update(float dt) {
 }
 
 void FirstPersonCamera::updateCameraVectors() {
-    quat quatX = quat::FromAngleAxis(-M_PI / 180.f * yaw, vec3f(0.0f, 1.0f, 0.0f));
-    quat quatY = quat::FromAngleAxis(-M_PI / 180.f * pitch, vec3f(1.0f, 0.0f, 0.0f));
-    transform.rot = (quatX * quatY).Normalized();
+    quatf quatX = aml::fromAngleAxis(-M_PI / 180.f * yaw, vec3f{0.0f, 1.0f, 0.0f});
+    quatf quatY = aml::fromAngleAxis(-M_PI / 180.f * pitch, vec3f{1.0f, 0.0f, 0.0f});
+    transform.rot = aml::normalize((quatX * quatY));
 }
 
 FirstPersonCamera::Config FirstPersonCamera::exportConfig() {
@@ -138,19 +136,19 @@ void FirstPersonCamera::importConfig(FirstPersonCamera::Config &data) {
 }
 
 mat4f FirstPersonCamera::getViewMatrix() const {
-    mat4f view = mat4f::LookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
+    mat4f view = aml::lookAt(transform.pos, transform.pos - transform.frontVec(), transform.upVec());
     return view;
 }
 
 mat4f FirstPersonCamera::getProjMatrix() const {
-    mat4f proj = mat4f::Perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
+    mat4f proj = aml::perspective(zoom, (float)settings->screenSize.x / (float)settings->screenSize.y, 0.01f, 1000.f);
     return proj;
 }
 
 void FirstPersonCamera::drawUI() {
     ImGui::Begin("Camera Info");
     ImGui::Text("pos: %f %f %f", transform.pos.x, transform.pos.y, transform.pos.z);
-    ImGui::Text("rot: %f %f %f %f", transform.rot[0], transform.rot[1], transform.rot[2], transform.rot[3]);
+    ImGui::Text("rot: %f %f %f %f", transform.rot.s, transform.rot.v0, transform.rot.v1, transform.rot.v2);
     ImGui::Text("scale: %f %f %f", transform.scale.x, transform.scale.y, transform.scale.z);
     ImGui::Text("pitch: %f, yaw: %f", pitch, yaw);
     ImGui::End();

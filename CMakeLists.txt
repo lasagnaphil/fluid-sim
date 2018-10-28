@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.11)
 set(PROJECT_NAME fluid_sim)
 project(${PROJECT_NAME})
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} -march=native)
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -40,8 +42,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glad ${CMAKE_DL_LIBS})
 
 # altlib
 set(ALTLIB_DIR deps/altlib)
+option(altlib_build_tests "" OFF)
 add_subdirectory(${ALTLIB_DIR})
 target_link_libraries(${PROJECT_NAME} PRIVATE altlib)
+
+# altmath
+set(ALTMATH_DIR deps/altmath)
+option(altmath_build_tests "" OFF)
+add_subdirectory(${ALTMATH_DIR})
+target_link_libraries(${PROJECT_NAME} PRIVATE altmath)
 
 # IMGUI
 set(IMGUI_DIR deps/imgui-1.65)
@@ -61,7 +70,3 @@ target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 # STB
 set(STB_DIR deps/stb)
 target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
-
-# mathfu
-set(MATHFU_DIR deps/mathfu/include)
-target_include_directories(${PROJECT_NAME} PRIVATE ${MATHFU_DIR})

@@ -9,8 +9,8 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
-#include <mathfu/vector.h>
-#include <math/Utils.h>
+#include <vec3.h>
+#include <utility.h>
 
 template <typename T, size_t NX, size_t NY, size_t NZ>
 struct Array3D {
@@ -63,7 +63,7 @@ struct Array3D {
     }
 
     // from http://www.realtimerendering.com/resources/GraphicsGems/gemsv/ch3-3/tricubic.c
-    T triCubic(mathfu::Vector<T, 3> p)
+    T triCubic(vec3<T> p)
     {
         int x = (int) p.x, y = (int) p.y, z = (int) p.z;
         if (x < 0 || x >= NX || y < 0 || y >= NY || z < 0 || z >= NZ)
@@ -96,15 +96,15 @@ struct Array3D {
 
         for (int k = 0; k < 4; k++)
         {
-            int zp = utils::clamp<int>(z+k-1, 0, NZ-1);
+            int zp = aml::clamp<int>(z+k-1, 0, NZ-1);
             q[k] = 0;
             for (int j = 0; j < 4; j++)
             {
-                int yp = utils::clamp<int>(y+j-1, 0, NY-1);
+                int yp = aml::clamp<int>(y+j-1, 0, NY-1);
                 r[j] = 0;
                 for (int i = 0; i < 4; i++)
                 {
-                    int xp = utils::clamp<int>(x+i-1, 0, NX-1);
+                    int xp = aml::clamp<int>(x+i-1, 0, NX-1);
                     r[j] += u[i] * data[zp][yp][xp];
                 }
                 q[k] += v[j] * r[j];

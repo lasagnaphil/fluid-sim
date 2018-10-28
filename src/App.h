@@ -16,7 +16,7 @@ struct WaterSim3D;
 struct WaterRenderer3D;
 
 struct AppSettings {
-    mathfu::vec2i screenSize = {800, 600};
+    vec2i screenSize = {800, 600};
 };
 
 struct App {
@@ -25,7 +25,7 @@ struct App {
     };
     static constexpr int MAX_SHADERS = 16;
 
-    void init(mathfu::vec2i screenSize, Mode mode);
+    void init(vec2i screenSize, Mode mode);
     void free();
     void start();
 

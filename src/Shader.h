@@ -5,7 +5,10 @@
 #pragma once
 
 #include <glad/glad.h>
-#include <mathfu/glsl_mappings.h>
+#include "mat4.h"
+#include "vec2.h"
+#include "vec3.h"
+#include "vec4.h"
 #include "Storage.h"
 #include "StringPool.h"
 
@@ -21,10 +24,10 @@ struct Shader {
     void setBool(const char* name, bool value);
     void setInt(const char* name, int value);
     void setFloat(const char* name, float value);
-    void setMatrix4(const char* name, const mathfu::mat4f& value);
-    void setVector2(const char* name, const mathfu::vec2f& value);
-    void setVector3(const char* name, const mathfu::vec3f& value);
-    void setVector4(const char* name, const mathfu::vec4f& value);
+    void setMatrix4(const char* name, const mat4f& value);
+    void setVector2(const char* name, const vec2f& value);
+    void setVector3(const char* name, const vec3f& value);
+    void setVector4(const char* name, const vec4f& value);
 
     void deserialize(json::Value json);
     json::Value serialize();

@@ -25,7 +25,7 @@ struct WaterSim3D {
     Array3D<CellType, SIZEX, SIZEY, SIZEZ> cell = {};
     MACGrid3D<SIZEX, SIZEY, SIZEZ> mac;
 
-    Vector3d gravity = {0, -9.8, 0};
+    vec3d gravity = {0, -9.8, 0};
     double rho = 1000.0;
     double dt = 0.01;
     double dx = 0.001;
@@ -52,7 +52,7 @@ struct WaterSim3D {
 
     void updateCells();
 
-    mathfu::vec3d clampPos(mathfu::vec3d x);
+    vec3d clampPos(vec3d x);
 };
 
 #endif //FLUID_SIM_WATERSIM_H

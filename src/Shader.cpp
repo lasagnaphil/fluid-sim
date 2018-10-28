@@ -6,8 +6,6 @@
 #include "Shader.h"
 #include "log.h"
 
-using namespace mathfu;
-
 GLuint compile_shader(GLenum type, const GLchar *source) {
     GLuint shader = glCreateShader(type);
 
@@ -87,15 +85,15 @@ void Shader::setMatrix4(const char *name, const mat4f& value) {
 }
 
 void Shader::setVector2(const char *name, const vec2f& value) {
-    glUniform2fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
+    glUniform2fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value);
 }
 
 void Shader::setVector3(const char* name, const vec3f& value) {
-    glUniform3fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
+    glUniform3fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value);
 }
 
 void Shader::setVector4(const char *name, const vec4f& value) {
-    glUniform4fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value.data_);
+    glUniform4fv(glGetUniformLocation(id, name), 1, (const GLfloat*) &value);
 }
 
 void Shader::deserialize(json::Value json) {

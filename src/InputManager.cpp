@@ -41,12 +41,12 @@ bool InputManager::isMouseExited(Uint8 button) {
     return (currMouse & SDL_BUTTON(button)) == 0 && (prevMouse & SDL_BUTTON(button)) != 0;
 }
 
-mathfu::vec2i InputManager::getMousePos() {
+vec2i InputManager::getMousePos() {
     return currMousePos;
 }
 
-mathfu::vec2i InputManager::getRelMousePos() {
-    mathfu::vec2i pos;
+vec2i InputManager::getRelMousePos() {
+    vec2i pos;
     SDL_GetRelativeMouseState(&pos.x, &pos.y);
     return pos;
 }

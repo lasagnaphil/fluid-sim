@@ -6,8 +6,8 @@
 #define FLUID_SIM_ARRAY2D_H
 
 #include <cstddef>
-#include <mathfu/vector.h>
 #include <Map.h>
+#include <vec2.h>
 
 template <typename T, size_t NX, size_t NY>
 struct Array2D {
@@ -59,7 +59,7 @@ struct Array2D {
         return result;
     }
 
-    T triCubic(mathfu::Vector<T, 2> p) {
+    T triCubic(vec2<T> p) {
         int x = (int) p.x, y = (int) p.y;
         if (x < 0 || x >= NX || y < 0 || y >= NY) {
             return 0;
