@@ -55,6 +55,11 @@ static float origCubeVertices[3*36] = {
     -0.5f,  0.5f, -0.5f,
 };
 
+constexpr float WaterRenderer3D::CELL_SIZE;
+constexpr float WaterRenderer3D::VEL_LINE_SCALE;
+constexpr size_t WaterRenderer3D::POINT_VERTEX_COUNT;
+constexpr size_t WaterRenderer3D::LINE_VERTEX_COUNT;
+
 void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     this->sim = sim;
 
