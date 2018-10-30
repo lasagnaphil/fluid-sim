@@ -3,6 +3,7 @@
 //
 
 #include "WaterRenderer2D.h"
+#include "App.h"
 
 const char* WaterRenderer2D::particleVS = R"SHADER(
 #version 330 core
@@ -73,6 +74,7 @@ void main() {
 
 void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     this->sim = sim;
+    this->camera = camera;
 
     const auto EMPTY_COLOR = vec4f(0.0f, 0.0f, 0.0f, 1.0f);
     const auto FLUID_COLOR = vec4f(0.0f, 0.0f, 1.0f, 1.0f);
@@ -100,6 +102,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glGenVertexArrays(1, &pressureCellVAO);
     glGenVertexArrays(1, &phiCellVAO);
     glGenVertexArrays(1, &particleVAO);
+    glGenVertexArrays(1, &particleVelVAO);
     glGenBuffers(1, &quadVBO);
     glGenBuffers(1, &waterCellOffsetVBO);
     glGenBuffers(1, &solidCellOffsetVBO);
@@ -108,6 +111,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glGenBuffers(1, &allCellOffsetVBO);
     glGenBuffers(1, &phiCellValueVBO);
     glGenBuffers(1, &particleVBO);
+    glGenBuffers(1, &particleVelVBO);
 
     glBindVertexArray(waterCellVAO);
 
@@ -173,7 +177,14 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glBindVertexArray(particleVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(vec2fp), 0);
+
+    glBindVertexArray(particleVelVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, particleVelVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
@@ -200,7 +211,7 @@ void WaterRenderer2D::update() {
             glBindVertexArray(pressureCellVAO);
             glBindBuffer(GL_ARRAY_BUFFER, pressureCellOffsetVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * pressureCellLocations.size, pressureCellLocations.data);
-            glBindVertexArray(particleVAO);
+            glBindVertexArray(particleVelVAO);
             glBindBuffer(GL_ARRAY_BUFFER, pressureCellValueVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * pressureCellValues.size, pressureCellValues.data);
             glBindVertexArray(0);
@@ -208,7 +219,13 @@ void WaterRenderer2D::update() {
         if (renderParticles) {
             glBindVertexArray(particleVAO);
             glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * particleLocations.size, particleLocations.data);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * particleVelLines.size, particleVelLines.data);
+            glBindVertexArray(0);
+        }
+        if (renderParticleVels) {
+            glBindVertexArray(particleVelVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, particleVelVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * particleVelLines.size, particleVelLines.data);
             glBindVertexArray(0);
         }
         if (renderLevelSet) {
@@ -217,6 +234,33 @@ void WaterRenderer2D::update() {
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * phiCellValues.size, phiCellValues.data);
             glBindVertexArray(0);
         }
+    }
+
+    // Change velocity using mouse drag
+    static vec2f startMousePos;
+    vec2f currMousePos;
+    constexpr float VEL_MOUSEDRAG_SCALE = 1.f;
+    auto inputMgr = InputManager::get();
+    if (inputMgr->isMouseEntered(SDL_BUTTON_LEFT)) {
+        startMousePos = vec2f(inputMgr->getMousePos());
+    }
+    else if (inputMgr->isMousePressed(SDL_BUTTON_LEFT)) {
+        currMousePos = vec2f(inputMgr->getMousePos());
+        vec2f velIncrease = VEL_MOUSEDRAG_SCALE * (currMousePos - startMousePos);
+
+        vec2f screenSize = vec2f(camera->settings->screenSize);
+        vec2f normMousePos = currMousePos - (screenSize / 2.f);
+        normMousePos.y *= -1;
+        vec2f gridPos = (normMousePos / camera->pixelsPerMeter / camera->zoom + camera->pos) / (float)sim->dx;
+
+        printf("pos: (%f, %f), velIncrease: (%f, %f)\n", gridPos.x, gridPos.y, velIncrease.x, velIncrease.y);
+
+        size_t ux = utils::clamp<size_t>(round(gridPos.x), 1, SIZEX - 2);
+        size_t uy = utils::clamp<size_t>(round(gridPos.y - 0.5), 1, SIZEY - 2);
+        sim->mac.u(ux, uy) += velIncrease.x;
+        size_t vx = utils::clamp<size_t>(round(gridPos.x - 0.5), 1, SIZEX - 2);
+        size_t vy = utils::clamp<size_t>(round(gridPos.y), 1, SIZEY - 2);
+        sim->mac.v(vx, vy) += velIncrease.y;
     }
 }
 
@@ -239,11 +283,16 @@ void WaterRenderer2D::draw() {
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, pressureCellLocations.size);
         glBindVertexArray(0);
     }
-
     if (renderParticles) {
         particleShader.use();
         glBindVertexArray(particleVAO);
-        glDrawArrays(GL_LINES, 0, particleLocations.size);
+        glDrawArrays(GL_POINTS, 0, particleVelLines.size / 2);
+        glBindVertexArray(0);
+    }
+    if (renderParticleVels) {
+        particleShader.use();
+        glBindVertexArray(particleVelVAO);
+        glDrawArrays(GL_LINES, 0, particleVelLines.size);
         glBindVertexArray(0);
     }
 
@@ -267,6 +316,7 @@ void WaterRenderer2D::drawUI() {
     ImGui::Checkbox("Render cells", &renderCells);
     ImGui::Checkbox("Render pressures", &renderPressures);
     ImGui::Checkbox("Render particles", &renderParticles);
+    ImGui::Checkbox("Render particle vels", &renderParticleVels);
     ImGui::Checkbox("Render level set", &renderLevelSet);
 
     ImGui::End();
@@ -297,13 +347,13 @@ void WaterRenderer2D::updateBuffers() {
             }
         });
     }
-    if (renderParticles) {
-        particleLocations.size = 2*sim->particles.size;
+    if (renderParticles || renderParticleVels) {
+        particleVelLines.size = 2*sim->particles.size;
         for (size_t i = 0; i < sim->particles.size; i++) {
-            particleLocations[2*i].x = (float)sim->particles[i].x;
-            particleLocations[2*i].y = (float)sim->particles[i].y;
-            particleLocations[2*i + 1].x = (float)sim->particles[i].x + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).x;
-            particleLocations[2*i + 1].y = (float)sim->particles[i].y + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).y;
+            particleVelLines[2*i].x = (float)sim->particles[i].x;
+            particleVelLines[2*i].y = (float)sim->particles[i].y;
+            particleVelLines[2*i + 1].x = (float)sim->particles[i].x + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).x;
+            particleVelLines[2*i + 1].y = (float)sim->particles[i].y + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).y;
         }
     }
     phiCellValues.size = 0;

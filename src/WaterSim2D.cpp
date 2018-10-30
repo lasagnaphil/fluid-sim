@@ -63,8 +63,8 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
 
 vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
     vec2d clamped;
-    clamped.x = utils::clamp(pos.x, 0.0, (double)SIZEX * dx - 1e-10);
-    clamped.y = utils::clamp(pos.y, 0.0, (double)SIZEY * dx - 1e-10);
+    clamped.x = utils::clamp(pos.x, dx + 1e-10, (double)(SIZEX-1) * dx - 1e-10);
+    clamped.y = utils::clamp(pos.y, dx + 1e-10, (double)(SIZEY-1) * dx - 1e-10);
     return clamped;
 }
 
