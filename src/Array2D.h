@@ -6,8 +6,10 @@
 #define FLUID_SIM_ARRAY2D_H
 
 #include <cstddef>
-#include <mathfu/vector.h>
+#include <mathfu/glsl_mappings.h>
 #include <Map.h>
+#include <Queue.h>
+#include <Defer.h>
 #include <math/Utils.h>
 
 template <typename T, size_t NX, size_t NY>
@@ -233,6 +235,49 @@ struct Array2D {
             value += kx1 * ky1 * (*this)(ui + 2, uj + 2);
         }
         return value;
+    }
+
+    void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
+        using mathfu::vec2i;
+        // TODO: for unknown cells, extrapolate velocity using p.65 (BFS)
+        auto Wu = Queue<vec2i>::create(2*(NX+NY));
+        defer {Wu.free();};
+        for (size_t j = 0; j < NY; j++) {
+            for (size_t i = 0; i < NX; i++) {
+                size_t im = i == 0 ? 0 : i - 1;
+                size_t ip = i == NX - 1 ? NX - 1 : i + 1;
+                size_t jm = j == 0 ? 0 : j - 1;
+                size_t jp = j == NY - 1 ? NY - 1 : j + 1;
+                if (intMask(i, j) &&
+                    (!intMask(im, j) || !intMask(ip, j) || !intMask(i, jm) || !intMask(i, jp))) {
+                    intMask(i, j) = 1;
+                    Wu.enq(vec2i(i, j));
+                }
+            }
+        }
+        int counter = 0;
+        while (Wu.size > 0) {
+            counter++;
+            vec2i pos = Wu.deq();
+            int x = pos.x, y = pos.y;
+            double sum = 0.0;
+            int count = 0;
+            for (auto& neighbor : {vec2i(x-1,y), vec2i(x+1,y), vec2i(x,y-1), vec2i(x,y+1)}) {
+                if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
+                if (intMask(neighbor.x, neighbor.y) < intMask(x,y)) {
+                    sum += (*this)(neighbor.x, neighbor.y);
+                    count++;
+                }
+            }
+            (*this)(x, y) = sum / count;
+            for (auto& neighbor : {vec2i(x-1,y), vec2i(x+1,y), vec2i(x,y-1), vec2i(x,y+1)}) {
+                if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
+                if (intMask(neighbor.x, neighbor.y) == UINT32_MAX) {
+                    intMask(neighbor.x, neighbor.y) = intMask(x,y) + 1;
+                    Wu.enq(neighbor);
+                }
+            }
+        }
     }
 };
 

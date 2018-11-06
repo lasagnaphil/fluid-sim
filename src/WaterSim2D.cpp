@@ -2,8 +2,9 @@
 // Created by lasagnaphil on 2018-09-18.
 //
 
-#include <Defer.h>
 #include <ctime>
+#include <Defer.h>
+#include <Queue.h>
 #include <math/Utils.h>
 #include <log.h>
 #include "WaterSim2D.h"
@@ -327,6 +328,11 @@ void WaterSim2D::applyProjection() {
 
 void WaterSim2D::updateVelocity() {
     // update velocity using the solved pressure
+    auto du = new Array2D<uint32_t, SIZEX+1, SIZEY>;
+    defer {delete du;};
+    auto dv = new Array2D<uint32_t, SIZEX, SIZEY+1>;
+    defer {delete dv;};
+
     {
         double scale = dt / (rho * dx);
         for (size_t j = 0; j < SIZEY; j++) {
@@ -348,10 +354,11 @@ void WaterSim2D::updateVelocity() {
                     else {
                         mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
                     }
+                    (*du)(i,j) = 0;
                 }
                 else {
                     // mark as unknown?
-                    // mac.u(i,j) = 0;
+                    (*du)(i,j) = UINT32_MAX;
                 }
                 if ((cell(i,j-1) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
                     if (cell(i,j-1) == CellType::SOLID || cell(i,j) == CellType::SOLID) {
@@ -370,15 +377,18 @@ void WaterSim2D::updateVelocity() {
                     else {
                         mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
                     }
+                    (*du)(i,j) = 0;
                 }
                 else {
                     // mark as unknown?
-                    // mac.v(i,j) = 0;
+                    (*dv)(i,j) = UINT32_MAX;
                 }
             }
         }
     }
-    // TODO: for unknown cells, extrapolate velocity using p.65 (BFS)
+
+    mac.u.extrapolate(*du);
+    mac.v.extrapolate(*dv);
 }
 
 void WaterSim2D::updateParticleVelocities() {
