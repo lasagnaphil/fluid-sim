@@ -29,6 +29,7 @@ struct WaterSim2D {
     Array2D<CellType, SIZEX, SIZEY> cell = {};
     Vec<mathfu::vec2d> particles = {};
     Array2D<double, SIZEX, SIZEY> phi = {};
+    Vec<mathfu::vec2d> particleVels = {};
 
     double gravity = -9.81;
     double rho = 997.0;
@@ -53,13 +54,15 @@ struct WaterSim2D {
 
     void applyAdvection();
 
+    void transferVelocityToGrid();
+
     void applyGravity();
 
     void applyProjection();
 
-    void updateCells();
-
     void updateVelocity();
+
+    void updateParticleVelocities();
 
     mathfu::vec2d clampPos(mathfu::vec2d pos);
 

@@ -36,6 +36,24 @@ struct Array2D {
         return *this;
     }
 
+    Array2D& operator/=(const Array2D& rhs) {
+        for (size_t j = 0; j < NY; j++)
+            for (size_t i = 0; i < NX; i++)
+                (*this)(i,j) /= rhs(i,j);
+        return *this;
+    }
+
+    void safeDivBy(const Array2D& rhs) {
+        for (size_t j = 0; j < NY; j++) {
+            for (size_t i = 0; i < NX; i++) {
+                if (rhs(i,j) != 0.0)
+                    (*this)(i,j) /= rhs(i,j);
+                else
+                    (*this)(i,j) = 0.0;
+            }
+        }
+    }
+
     // TODO: FMA this
     void setMultiplyAdd(Array2D& a, T b, const Array2D& c) {
         for (size_t j = 0; j < NY; j++)
@@ -101,6 +119,120 @@ struct Array2D {
 
 #undef CUBE
 #undef SQR
+    }
+
+    void distribute(mathfu::Vector<T, 2> pos, T value) {
+        int ui = (int) (pos.x);
+        int uj = (int) (pos.y);
+        auto disp = mathfu::Vector<T, 2>(pos.x - ui, pos.y - uj);
+        T kx1 = (0.5 - disp.x) * (0.5 - disp.x);
+        T kx2 = (0.75 - disp.x * disp.x);
+        T kx3 = 0.75 - (1.0 - disp.x) * (1.0 - disp.x);
+        T ky1 = (0.5 - disp.y) * (0.5 - disp.y);
+        T ky2 = (0.75 - disp.y * disp.y);
+        T ky3 = 0.75 - (1.0 - disp.y) * (1.0 - disp.y);
+        if (disp.x < 0.5 && disp.y < 0.5) {
+            (*this)(ui - 1, uj - 1) += kx1 * ky1 * value;
+            (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
+            (*this)(ui - 1, uj + 1) += kx1 * ky3 * value;
+            (*this)(ui    , uj - 1) += kx2 * ky1 * value;
+            (*this)(ui    , uj    ) += kx2 * ky2 * value;
+            (*this)(ui    , uj + 1) += kx2 * ky3 * value;
+            (*this)(ui + 1, uj - 1) += kx3 * ky1 * value;
+            (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
+            (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
+        }
+        else if (disp.x > 0.5 && disp.y < 0.5) {
+            (*this)(ui    , uj - 1) += kx2 * ky1 * value;
+            (*this)(ui    , uj    ) += kx2 * ky2 * value;
+            (*this)(ui    , uj + 1) += kx2 * ky3 * value;
+            (*this)(ui + 1, uj - 1) += kx3 * ky1 * value;
+            (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
+            (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
+            (*this)(ui + 2, uj - 1) += kx1 * ky1 * value;
+            (*this)(ui + 2, uj    ) += kx1 * ky2 * value;
+            (*this)(ui + 2, uj + 1) += kx1 * ky3 * value;
+        }
+        else if (disp.x < 0.5 && disp.y > 0.5) {
+            (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
+            (*this)(ui - 1, uj + 1) += kx1 * ky3 * value;
+            (*this)(ui - 1, uj + 2) += kx1 * ky1 * value;
+            (*this)(ui    , uj    ) += kx2 * ky2 * value;
+            (*this)(ui    , uj + 1) += kx2 * ky3 * value;
+            (*this)(ui    , uj + 2) += kx2 * ky1 * value;
+            (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
+            (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
+            (*this)(ui + 1, uj + 2) += kx3 * ky1 * value;
+        }
+        else if (disp.x > 0.5 && disp.y > 0.5) {
+            (*this)(ui    , uj    ) += kx2 * ky2 * value;
+            (*this)(ui    , uj + 1) += kx2 * ky3 * value;
+            (*this)(ui    , uj + 2) += kx2 * ky1 * value;
+            (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
+            (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
+            (*this)(ui + 1, uj + 2) += kx3 * ky1 * value;
+            (*this)(ui + 2, uj    ) += kx1 * ky2 * value;
+            (*this)(ui + 2, uj + 1) += kx1 * ky3 * value;
+            (*this)(ui + 2, uj + 2) += kx1 * ky1 * value;
+        }
+    }
+
+    T extract(mathfu::Vector<T, 2> pos) {
+        T value = (T) 0;
+        int ui = (int) (pos.x);
+        int uj = (int) (pos.y);
+        auto disp = mathfu::Vector<T, 2>(pos.x - ui, pos.y - uj);
+        T kx1 = (0.5 - disp.x) * (0.5 - disp.x);
+        T kx2 = (0.75 - disp.x * disp.x);
+        T kx3 = 0.75 - (1.0 - disp.x) * (1.0 - disp.x);
+        T ky1 = (0.5 - disp.y) * (0.5 - disp.y);
+        T ky2 = (0.75 - disp.y * disp.y);
+        T ky3 = 0.75 - (1.0 - disp.y) * (1.0 - disp.y);
+        if (disp.x < 0.5 && disp.y < 0.5) {
+            value += kx1 * ky1 * (*this)(ui - 1, uj - 1);
+            value += kx1 * ky2 * (*this)(ui - 1, uj    );
+            value += kx1 * ky3 * (*this)(ui - 1, uj + 1);
+            value += kx2 * ky1 * (*this)(ui    , uj - 1);
+            value += kx2 * ky2 * (*this)(ui    , uj    );
+            value += kx2 * ky3 * (*this)(ui    , uj + 1);
+            value += kx3 * ky1 * (*this)(ui + 1, uj - 1);
+            value += kx3 * ky2 * (*this)(ui + 1, uj    );
+            value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
+        }
+        else if (disp.x > 0.5 && disp.y < 0.5) {
+            value += kx2 * ky1 * (*this)(ui    , uj - 1);
+            value += kx2 * ky2 * (*this)(ui    , uj    );
+            value += kx2 * ky3 * (*this)(ui    , uj + 1);
+            value += kx3 * ky1 * (*this)(ui + 1, uj - 1);
+            value += kx3 * ky2 * (*this)(ui + 1, uj    );
+            value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
+            value += kx1 * ky1 * (*this)(ui + 2, uj - 1);
+            value += kx1 * ky2 * (*this)(ui + 2, uj    );
+            value += kx1 * ky3 * (*this)(ui + 2, uj + 1);
+        }
+        else if (disp.x < 0.5 && disp.y > 0.5) {
+            value += kx1 * ky2 * (*this)(ui - 1, uj    );
+            value += kx1 * ky3 * (*this)(ui - 1, uj + 1);
+            value += kx1 * ky1 * (*this)(ui - 1, uj + 2);
+            value += kx2 * ky2 * (*this)(ui    , uj    );
+            value += kx2 * ky3 * (*this)(ui    , uj + 1);
+            value += kx2 * ky1 * (*this)(ui    , uj + 2);
+            value += kx3 * ky2 * (*this)(ui + 1, uj    );
+            value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
+            value += kx3 * ky1 * (*this)(ui + 1, uj + 2);
+        }
+        else if (disp.x > 0.5 && disp.y > 0.5) {
+            value += kx2 * ky2 * (*this)(ui    , uj    );
+            value += kx2 * ky3 * (*this)(ui    , uj + 1);
+            value += kx2 * ky1 * (*this)(ui    , uj + 2);
+            value += kx3 * ky2 * (*this)(ui + 1, uj    );
+            value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
+            value += kx3 * ky1 * (*this)(ui + 1, uj + 2);
+            value += kx1 * ky2 * (*this)(ui + 2, uj    );
+            value += kx1 * ky3 * (*this)(ui + 2, uj + 1);
+            value += kx1 * ky1 * (*this)(ui + 2, uj + 2);
+        }
+        return value;
     }
 };
 

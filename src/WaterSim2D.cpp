@@ -48,7 +48,7 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     cell(65,14) = CellType::SOLID;
      */
 
-    particles.reserve(fluidCount);
+    particles.reserve(4*fluidCount);
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
             particles.push(vec2d((double)i + randf(), (double)j + randf()) * dx);
@@ -58,14 +58,18 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
         }
     });
 
+    particleVels.resize(4*fluidCount);
+    for (int i = 0; i < 4*fluidCount; i++) {
+        particleVels[i] = vec2d(0.0, 0.0);
+    }
+
     createLevelSet();
 }
 
 vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
-    vec2d clamped;
-    clamped.x = utils::clamp(pos.x, dx + 1e-10, (double)(SIZEX-1) * dx - 1e-10);
-    clamped.y = utils::clamp(pos.y, dx + 1e-10, (double)(SIZEY-1) * dx - 1e-10);
-    return clamped;
+    pos.x = utils::clamp(pos.x, (1.0 + 1e-6) * dx, (SIZEX - 1 - 1e-6) * dx);
+    pos.y = utils::clamp(pos.y, (1.0 + 1e-6) * dx, (SIZEY - 1 - 1e-6) * dx);
+    return pos;
 }
 
 void WaterSim2D::runFrame() {
@@ -73,15 +77,17 @@ void WaterSim2D::runFrame() {
     createLevelSet();
     stage = StageType::UpdateLevelSet;
     updateLevelSet();
-    stage = StageType::ApplyAdvection;
-    applyAdvection();
+    // stage = StageType::TransferVelocityToGrid;
+    transferVelocityToGrid();
     stage = StageType::ApplyGravity;
     applyGravity();
     stage = StageType::ApplyProjection;
     applyProjection();
     updateVelocity();
     stage = StageType::UpdateCells;
-    updateCells();
+    updateParticleVelocities();
+    stage = StageType::ApplyAdvection;
+    applyAdvection();
     rendered = false;
     currentTime += dt;
 }
@@ -123,58 +129,39 @@ void WaterSim2D::update() {
         rendered = false;
     }
      */
-    runFrame();
-    /*
+    // runFrame();
+    // /*
     if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
         runFrame();
     }
-     */
+    // */
 }
 
-void WaterSim2D::applyAdvection() {
-    double C = 5;
-    iterateU([&](size_t i, size_t j) {
-        vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
-        double tau = 0;
-        bool finished = false;
-        while (!finished) {
-            auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Normalize() + 10e-37);
-            if (tau + dtau >= dt) {
-                dtau = dt - tau;
-                finished = true;
-            }
-            else if (tau + 2 * dtau >= dt) {
-                dtau = 0.5 * (dt - tau);
-            }
-            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-            tau += dtau;
-        }
-        mac.u(i,j) = mac.velInterpU(x_p);
-    });
-    iterateV([&](size_t i, size_t j) {
-        vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
-        double tau = 0;
-        bool finished = false;
-        while (!finished) {
-            auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Normalize() + 10e-37);
-            if (tau + dtau >= dt) {
-                dtau = dt - tau;
-                finished = true;
-            }
-            else if (tau + 2 * dtau >= dt) {
-                dtau = 0.5 * (dt - tau);
-            }
-            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-            tau += dtau;
-        }
-        mac.v(i,j) = mac.velInterpV(x_p);
-    });
+double quadraticKernel(double r) {
+    if (r >= -1.5 && r < -0.5) { return 0.5*(r + 1.5)*(r + 15); }
+    else if (r >= -0.5 && r < 0.5) { return 0.75 - r*r; }
+    else if (r >= 0.5 && r < 1.5) { return 0.5*(1.5 - r)*(1.5 - r); }
+    else return 0;
+}
+
+void WaterSim2D::transferVelocityToGrid() {
+    mac.u.reset();
+    mac.v.reset();
+    auto udiv = new Array2D<double, SIZEX+1, SIZEY>();
+    auto vdiv = new Array2D<double, SIZEX, SIZEY+1>();
+    for (int e = 0; e < particles.size; e++) {
+        auto& xp = particles[e];
+        auto upos = vec2d(xp.x / dx - 0.5, xp.y / dx);
+        mac.u.distribute(upos, particleVels[e].x);
+        udiv->distribute(upos, 1.0f);
+        auto vpos = vec2d(xp.x / dx, xp.y / dx - 0.5);
+        mac.v.distribute(vpos, particleVels[e].y);
+        vdiv->distribute(vpos, 1.0f);
+    }
+    mac.u.safeDivBy(*udiv);
+    mac.v.safeDivBy(*vdiv);
+    delete udiv;
+    delete vdiv;
 }
 
 void WaterSim2D::applyGravity() {
@@ -250,19 +237,20 @@ void WaterSim2D::applyProjection() {
         constexpr double tau = 0.97;
         constexpr double sigma = 0.25;
         double e;
-        iterate([&](size_t i, size_t j) {
-            if (cell(i, j) == CellType::FLUID) {
-                e = Adiag(i,j)
-                    - (i > 0? SQUARE(Ax(i-1,j) * precon(i-1,j)) : 0)
-                    - (j > 0? SQUARE(Ay(i,j-1) * precon(i,j-1)) : 0)
-                    - tau * ((i > 0? Ax(i-1,j)*Ay(i-1,j)*SQUARE(precon(i-1,j)) : 0)
-                             + (j > 0? Ay(i,j-1)*Ax(i,j-1)*SQUARE(precon(i,j-1)) : 0));
-                if (e < sigma * Adiag(i,j)) {
-                    e = Adiag(i,j);
+        for (size_t j = 1; j < SIZEY; j++) {
+            for (size_t i = 1; i < SIZEX; i++) {
+                if (cell(i, j) == CellType::FLUID) {
+                    e = Adiag(i,j)
+                        - SQUARE(Ax(i-1,j) * precon(i-1,j))
+                        - SQUARE(Ay(i,j-1) * precon(i,j-1))
+                        - tau * (Ax(i-1,j)*Ay(i-1,j)*SQUARE(precon(i-1,j)) + Ay(i,j-1)*Ax(i,j-1)*SQUARE(precon(i,j-1)));
+                    if (e < sigma * Adiag(i,j)) {
+                        e = Adiag(i,j);
+                    }
+                    precon(i,j) = 1 / sqrt(e);
                 }
-                precon(i,j) = 1 / sqrt(e);
             }
-        });
+        }
     }
 #undef SQUARE
 
@@ -273,26 +261,32 @@ void WaterSim2D::applyProjection() {
     auto applyPreconditioner = [&]() {
         // apply preconditioner
         auto& q = gridStack.newItem();
-        iterate([&](size_t i, size_t j) {
-            if (cell(i,j) == CellType::FLUID) {
-                double t = r(i,j) - (i > 0? Ax(i-1,j) * precon(i-1,j) * q(i-1,j) : 0)
-                           - (j > 0? Ay(i,j-1) * precon(i,j-1) * q(i,j-1) : 0);
-                q(i,j) = t * precon(i,j);
+        for (size_t j = 1; j < SIZEY; j++) {
+            for (size_t i = 1; i < SIZEX; i++) {
+                if (cell(i,j) == CellType::FLUID) {
+                    double t = r(i,j)
+                            - Ax(i-1,j) * precon(i-1,j) * q(i-1,j)
+                            - Ay(i,j-1) * precon(i,j-1) * q(i,j-1);
+                    q(i,j) = t * precon(i,j);
+                }
             }
-        });
-        iterateBackwards([&](size_t i, size_t j) {
-            if (cell(i,j) == CellType::FLUID) {
-                double t = q(i,j) - (i < SIZEX - 1? Ax(i,j) * precon(i,j) * z(i+1,j) : 0)
-                           - (j < SIZEY - 1? Ay(i,j) * precon(i,j) * z(i,j+1) : 0);
-                z(i,j) = t * precon(i,j);
+        }
+        for (size_t j = SIZEY - 1; j-- > 0; ) {
+            for (size_t i = SIZEX - 1; i-- > 0; ) {
+                if (cell(i,j) == CellType::FLUID) {
+                    double t = q(i,j)
+                            - Ax(i,j) * precon(i,j) * z(i+1,j)
+                            - Ay(i,j) * precon(i,j) * z(i,j+1);
+                    z(i,j) = t * precon(i,j);
+                }
             }
-        });
+        }
         gridStack.pop();
     };
 
     // use PCG algorithm to solve the linear equation
     p.reset();
-    r = rhs;
+    r.copyFrom(rhs);
     applyPreconditioner();
     s = z;
     double sigma = z.innerProduct(r);
@@ -303,17 +297,17 @@ void WaterSim2D::applyProjection() {
         iterate([&](size_t i, size_t j) {
             if (cell(i,j) == CellType::FLUID) {
                 z(i, j) = Adiag(i, j) * s(i, j)
-                          + (i > 0 ? Ax(i - 1, j) * s(i - 1, j) : 0)
-                          + (i < SIZEX - 1 ? Ax(i, j) * s(i + 1, j) : 0)
-                          + (j > 0 ? Ay(i, j - 1) * s(i, j - 1) : 0)
-                          + (j < SIZEY - 1 ? Ay(i, j) * s(i, j + 1) : 0);
+                          + Ax(i - 1, j) * s(i - 1, j)
+                          + Ax(i, j) * s(i + 1, j)
+                          + Ay(i, j - 1) * s(i, j - 1)
+                          + Ay(i, j) * s(i, j + 1);
             }
         });
 
         double alpha = sigma / z.innerProduct(s);
         p.setMultiplyAdd(p, alpha, s);
         r.setMultiplyAdd(r, -alpha, z);
-        if (r.infiniteNorm() <= 1e-6 * rhs.infiniteNorm()) { break; }
+        if (r.infiniteNorm() <= 1e-12 * rhs.infiniteNorm()) { break; }
 
         applyPreconditioner();
 
@@ -387,8 +381,18 @@ void WaterSim2D::updateVelocity() {
     // TODO: for unknown cells, extrapolate velocity using p.65 (BFS)
 }
 
-void WaterSim2D::updateCells() {
-    srand(time(NULL));
+void WaterSim2D::updateParticleVelocities() {
+    for (int e = 0; e < particles.size; e++) {
+        vec2d upos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
+        double velX = mac.u.extract(upos);
+        vec2d vpos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
+        double velY = mac.v.extract(vpos);
+        particleVels[e] = vec2d(velX, velY);
+    }
+}
+
+
+void WaterSim2D::applyAdvection() {
     Grid2D<CellType>* oldCell = new Grid2D<CellType>();
     defer {delete oldCell;};
     oldCell->copyFrom(cell);
@@ -409,6 +413,7 @@ void WaterSim2D::updateCells() {
         }
     }
 }
+
 
 double WaterSim2D::avgPressure() {
     double avgP = 0.0f;
@@ -511,7 +516,7 @@ void WaterSim2D::updateLevelSet() {
         }
     }
 
-    for (int k = 0; k < 2; k++) {
+    for (int k = 0; k < 8; k++) {
         for (size_t j = 0; j < SIZEY - 1; j++) {
             for (size_t i = 0; i < SIZEX - 1; i++) {
                 double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
@@ -570,13 +575,15 @@ void WaterSim2D::updateLevelSet() {
     defer {delete oldPhi;};
 
     oldPhi->copyFrom(phi);
-    for (size_t j = 0; j < SIZEY; j++) {
-        for (size_t i = 0; i < SIZEX; i++) {
+    for (size_t j = 1; j < SIZEY-1; j++) {
+        for (size_t i = 1; i < SIZEX-1; i++) {
+            /*
             size_t im = i == 0? 0 : i-1;
             size_t jm = j == 0? 0 : j-1;
             size_t ip = i == SIZEX-1? SIZEX-1 : i+1;
             size_t jp = j == SIZEY-1? SIZEY-1 : j+1;
-            double avg = 0.25 * ((*oldPhi)(im,j) + (*oldPhi)(ip,j) + (*oldPhi)(i,jm) + (*oldPhi)(i,jp));
+             */
+            double avg = 0.25 * ((*oldPhi)(i-1,j) + (*oldPhi)(i+1,j) + (*oldPhi)(i,j-1) + (*oldPhi)(i,j+1));
             if (avg < phi(i,j))
                 phi(i,j) = avg;
         }

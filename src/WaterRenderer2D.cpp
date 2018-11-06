@@ -239,7 +239,7 @@ void WaterRenderer2D::update() {
     // Change velocity using mouse drag
     static vec2f startMousePos;
     vec2f currMousePos;
-    constexpr float VEL_MOUSEDRAG_SCALE = 1.f;
+    constexpr float VEL_MOUSEDRAG_SCALE = 0.1f;
     auto inputMgr = InputManager::get();
     if (inputMgr->isMouseEntered(SDL_BUTTON_LEFT)) {
         startMousePos = vec2f(inputMgr->getMousePos());
@@ -249,18 +249,19 @@ void WaterRenderer2D::update() {
         vec2f velIncrease = VEL_MOUSEDRAG_SCALE * (currMousePos - startMousePos);
 
         vec2f screenSize = vec2f(camera->settings->screenSize);
-        vec2f normMousePos = currMousePos - (screenSize / 2.f);
+        vec2f normMousePos = startMousePos - (screenSize / 2.f);
         normMousePos.y *= -1;
         vec2f gridPos = (normMousePos / camera->pixelsPerMeter / camera->zoom + camera->pos) / (float)sim->dx;
 
-        printf("pos: (%f, %f), velIncrease: (%f, %f)\n", gridPos.x, gridPos.y, velIncrease.x, velIncrease.y);
-
-        size_t ux = utils::clamp<size_t>(round(gridPos.x), 1, SIZEX - 2);
-        size_t uy = utils::clamp<size_t>(round(gridPos.y - 0.5), 1, SIZEY - 2);
-        sim->mac.u(ux, uy) += velIncrease.x;
-        size_t vx = utils::clamp<size_t>(round(gridPos.x - 0.5), 1, SIZEX - 2);
-        size_t vy = utils::clamp<size_t>(round(gridPos.y), 1, SIZEY - 2);
-        sim->mac.v(vx, vy) += velIncrease.y;
+        if (gridPos.x >= 1 && gridPos.x <= SIZEX - 2 && gridPos.y >= 1 && gridPos.y <= SIZEY - 2) {
+            printf("pos: (%f, %f), velIncrease: (%f, %f)\n", gridPos.x, gridPos.y, velIncrease.x, velIncrease.y);
+            size_t ux = utils::clamp<size_t>(gridPos.x, 1, SIZEX - 2);
+            size_t uy = utils::clamp<size_t>(gridPos.y - 0.5, 1, SIZEY - 2);
+            sim->mac.u(ux, uy) += velIncrease.x;
+            size_t vx = utils::clamp<size_t>(gridPos.x - 0.5, 1, SIZEX - 2);
+            size_t vy = utils::clamp<size_t>(gridPos.y, 1, SIZEY - 2);
+            sim->mac.v(vx, vy) += velIncrease.y;
+        }
     }
 }
 
@@ -359,7 +360,7 @@ void WaterRenderer2D::updateBuffers() {
     phiCellValues.size = 0;
     if (renderLevelSet) {
         sim->iterate([&](size_t i, size_t j) {
-            phiCellValues.push(utils::sigmoid<float>(1.0f * sim->phi(i,j)));
+            phiCellValues.push(utils::sigmoid<float>(100.0f * sim->phi(i,j)));
         });
     }
 }
