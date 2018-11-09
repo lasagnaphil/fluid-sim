@@ -19,7 +19,7 @@ inline double randf() {
 void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     this->dt = dt;
     this->dx = mac.dx = dx;
-    this->dr = dx * 0.9;
+    this->dr = 0.9 * dx;
     this->rho = rho;
     this->gravity = gravity;
 
@@ -33,6 +33,12 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
             cell(i, j) = CellType::FLUID;
             fluidCount++;
         }
+        /*
+        else if (i >= (int)(SIZEX*0.7) && i <= (int)(SIZEX*0.9) && j >= (int)(SIZEY*0.7) && j <= (int)(SIZEY*0.9)) {
+            cell(i, j) = CellType::FLUID;
+            fluidCount++;
+        }
+         */
         else {
             cell(i, j) = CellType::EMPTY;
         }
@@ -116,19 +122,19 @@ void WaterSim2D::update() {
     auto inputMgr = InputManager::get();
     /*
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        if (stage == StageType::Init) {
+        if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
             stage = StageType::CreateLevelSet;
-            // createLevelSet();
+            createLevelSet();
         }
         else if (stage == StageType::CreateLevelSet) {
             stage = StageType::UpdateLevelSet;
-            // updateLevelSet();
+            updateLevelSet();
         }
         else if (stage == StageType::UpdateLevelSet) {
-            stage = StageType::ApplyAdvection;
-            applyAdvection();
+            stage = StageType::ApplySemiLagrangianAdvection;
+            applySemiLagrangianAdvection();
         }
-        else if (stage == StageType::ApplyAdvection) {
+        else if (stage == StageType::ApplySemiLagrangianAdvection) {
             stage = StageType::ApplyGravity;
             applyGravity();
         }
@@ -138,23 +144,21 @@ void WaterSim2D::update() {
             updateVelocity();
         }
         else if (stage == StageType::ApplyProjection) {
-            stage = StageType::UpdateCells;
-            updateCells();
-            currentTime += dt;
+            stage = StageType::UpdateVelocity;
+            updateVelocity();
         }
-        else if (stage == StageType::UpdateCells) {
-            stage = StageType::CreateLevelSet;
-            // createLevelSet();
+        else if (stage == StageType::UpdateVelocity) {
+            stage = StageType::ApplyAdvection;
+            applyAdvection();
+            currentTime += dt;
         }
         rendered = false;
     }
      */
     // runFrame();
-    // /*
-    // if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
+    if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
         runFrame();
-    // }
-    // */
+    }
 }
 
 double quadraticKernel(double r) {
@@ -367,7 +371,7 @@ void WaterSim2D::applyProjection() {
     p.reset();
     r.copyFrom(rhs);
     applyPreconditioner();
-    s = z;
+    s.copyFrom(z);
     double sigma = z.innerProduct(r);
     int maxIters = 200;
     int iter = 0;
@@ -383,10 +387,14 @@ void WaterSim2D::applyProjection() {
             }
         });
 
+        // Note: this code is needed to handle when rhs = 0 (No boundary conditions) -> p = 0 everywhere
+        double rhsNorm = rhs.infiniteNorm();
+        if (rhsNorm <= 1e-12) { break; }
+
         double alpha = sigma / z.innerProduct(s);
         p.setMultiplyAdd(p, alpha, s);
         r.setMultiplyAdd(r, -alpha, z);
-        if (r.infiniteNorm() <= 1e-12 * rhs.infiniteNorm()) { break; }
+        if (r.infiniteNorm() <= 1e-12 * rhsNorm) { break; }
 
         applyPreconditioner();
 
@@ -432,7 +440,6 @@ void WaterSim2D::updateVelocity() {
                     else {
                         mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
                     }
-                    (*du)(i,j) = 0;
                 }
                 else {
                     // mark as unknown?
@@ -455,7 +462,6 @@ void WaterSim2D::updateVelocity() {
                     else {
                         mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
                     }
-                    (*du)(i,j) = 0;
                 }
                 else {
                     // mark as unknown?
@@ -525,6 +531,17 @@ double WaterSim2D::avgPressureInFluid() {
     return avgP;
 }
 
+double WaterSim2D::maxVelocity() {
+    double maxVel = 0.0f;
+    iterate([&](size_t i, size_t j) {
+        if (cell(i,j) == CellType::FLUID) {
+            double vel = mac.velInterp(vec2d(i,j)*dx).Normalize();
+            if (vel > maxVel) maxVel = vel;
+        }
+    });
+    return maxVel;
+}
+
 vec2d WaterSim2D::getGridCenter() {
     return vec2d(SIZEX * dx / 2, SIZEY * dx / 2);
 }
@@ -558,12 +575,10 @@ void WaterSim2D::createLevelSet() {
             size_t e = (*t)(i_list[k],j_list[k]);
             if (e != -1) {
                 auto pos = particles[e];
-                if (e != (size_t)-1) {
-                    double d = sqrt((pos.x - i*dx)*(pos.x - i*dx) + (pos.y - j*dx)*(pos.y - j*dx)) - dr;
-                    if (d < phi(i,j)) {
-                        phi(i,j) = d;
-                        (*t)(i,j) = e;
-                    }
+                double d = sqrt((pos.x - i*dx)*(pos.x - i*dx) + (pos.y - j*dx)*(pos.y - j*dx)) - dr;
+                if (d < phi(i,j)) {
+                    phi(i,j) = d;
+                    (*t)(i,j) = e;
                 }
             }
         }
@@ -575,21 +590,25 @@ void WaterSim2D::updateLevelSet() {
     auto isSurface = new Grid2D<bool>();
     memset(isSurface->data, false, SIZEX*SIZEY);
     defer {delete isSurface;};
+    auto oldPhi = new Grid2D<double>();
+    defer {delete oldPhi;};
+
+    oldPhi->copyFrom(phi);
     for (size_t j = 0; j < SIZEY - 1; j++) {
         for (size_t i = 0; i < SIZEX - 1; i++) {
-            if (phi(i,j) * phi(i+1,j) < 0.0) {
-                double theta1 = phi(i,j) / (phi(i,j) - phi(i+1,j));
-                double theta2 = phi(i+1,j) / (phi(i+1,j) - phi(i,j));
-                phi(i,j) = utils::sgn(phi(i,j)) * theta1 * dx;
-                phi(i+1,j) = utils::sgn(phi(i+1,j)) * theta2 * dx;
+            if ((*oldPhi)(i,j) * (*oldPhi)(i+1,j) < 0.0) {
+                double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i+1,j));
+                double theta2 = (*oldPhi)(i+1,j) / ((*oldPhi)(i+1,j) - (*oldPhi)(i,j));
+                phi(i,j) = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
+                phi(i+1,j) = utils::sgn((*oldPhi)(i+1,j)) * theta2 * dx;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i+1,j) = true;
             }
-            if (phi(i,j) * phi(i,j+1) < 0.0) {
-                double theta1 = phi(i,j) / (phi(i,j) - phi(i,j+1));
-                double theta2 = phi(i,j+1) / (phi(i,j+1) - phi(i,j));
-                phi(i,j) = utils::sgn(phi(i,j)) * theta1 * dx;
-                phi(i,j+1) = utils::sgn(phi(i,j+1)) * theta2 * dx;
+            if ((*oldPhi)(i,j) * (*oldPhi)(i,j+1) < 0.0) {
+                double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i,j+1));
+                double theta2 = (*oldPhi)(i,j+1) / ((*oldPhi)(i,j+1) - (*oldPhi)(i,j));
+                phi(i,j) = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
+                phi(i,j+1) = utils::sgn((*oldPhi)(i,j+1)) * theta2 * dx;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i,j+1) = true;
             }
@@ -605,73 +624,72 @@ void WaterSim2D::updateLevelSet() {
     }
 
     for (int k = 0; k < 8; k++) {
+        oldPhi->copyFrom(phi);
         for (size_t j = 0; j < SIZEY - 1; j++) {
             for (size_t i = 0; i < SIZEX - 1; i++) {
-                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
-                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j+1)));
+                double phi0 = utils::min(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j+1)));
+                double phi1 = utils::max(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn(phi(i,j)) * d;
+                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
                 }
             }
         }
+        oldPhi->copyFrom(phi);
         for (size_t j = 0; j < SIZEY - 1; j++) {
             for (size_t i = SIZEX; i-- > 1;) {
-                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j+1)));
-                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j+1)));
+                double phi0 = utils::min(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j+1)));
+                double phi1 = utils::max(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn(phi(i,j)) * d;
+                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
                 }
             }
         }
+        oldPhi->copyFrom(phi);
         for (size_t j = SIZEY; j-- > 1;) {
             for (size_t i = 0; i < SIZEX - 1; i++) {
-                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j-1)));
-                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j-1)));
+                double phi0 = utils::min(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j-1)));
+                double phi1 = utils::max(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn(phi(i,j)) * d;
+                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
                 }
             }
         }
+        oldPhi->copyFrom(phi);
         for (size_t j = SIZEY; j-- > 1;) {
             for (size_t i = SIZEX; i-- > 1;) {
-                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j-1)));
-                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j-1)));
+                double phi0 = utils::min(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j-1)));
+                double phi1 = utils::max(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn(phi(i,j)) * d;
+                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
                 }
             }
         }
     }
 
-    auto oldPhi = new Grid2D<double>();
-    defer {delete oldPhi;};
-
     oldPhi->copyFrom(phi);
     for (size_t j = 1; j < SIZEY-1; j++) {
         for (size_t i = 1; i < SIZEX-1; i++) {
-            /*
             size_t im = i == 0? 0 : i-1;
             size_t jm = j == 0? 0 : j-1;
             size_t ip = i == SIZEX-1? SIZEX-1 : i+1;
             size_t jp = j == SIZEY-1? SIZEY-1 : j+1;
-             */
-            double avg = 0.25 * ((*oldPhi)(i-1,j) + (*oldPhi)(i+1,j) + (*oldPhi)(i,j-1) + (*oldPhi)(i,j+1));
+            double avg = 0.25 * ((*oldPhi)(im,j) + (*oldPhi)(ip,j) + (*oldPhi)(i,jm) + (*oldPhi)(i,jp));
             if (avg < phi(i,j))
                 phi(i,j) = avg;
         }

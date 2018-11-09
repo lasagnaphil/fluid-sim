@@ -234,6 +234,7 @@ void WaterRenderer2D::update() {
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * phiCellValues.size, phiCellValues.data);
             glBindVertexArray(0);
         }
+        sim->rendered = true;
     }
 
     // Change velocity using mouse drag
@@ -314,6 +315,11 @@ void WaterRenderer2D::drawUI() {
     ImGui::Text("Current stage: %s", sim->printStage());
     ImGui::Text("Average pressure: %f", sim->avgPressure());
     ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
+    double maxVelocity = sim->maxVelocity();
+    ImGui::Text("Max velocity in fluid: %f", maxVelocity);
+    double CFLnum = sim->dt * maxVelocity / sim->dx;
+    ImGui::Text("CFL Number: %f", CFLnum);
+
     ImGui::Checkbox("Render cells", &renderCells);
     ImGui::Checkbox("Render pressures", &renderPressures);
     ImGui::Checkbox("Render particles", &renderParticles);
@@ -353,8 +359,8 @@ void WaterRenderer2D::updateBuffers() {
         for (size_t i = 0; i < sim->particles.size; i++) {
             particleVelLines[2*i].x = (float)sim->particles[i].x;
             particleVelLines[2*i].y = (float)sim->particles[i].y;
-            particleVelLines[2*i + 1].x = (float)sim->particles[i].x + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).x;
-            particleVelLines[2*i + 1].y = (float)sim->particles[i].y + VEL_SIZE * (float)sim->mac.velInterp(sim->particles[i]).y;
+            particleVelLines[2*i + 1].x = (float)sim->particles[i].x + (float)sim->dt * (float)sim->mac.velInterp(sim->particles[i]).x;
+            particleVelLines[2*i + 1].y = (float)sim->particles[i].y + (float)sim->dt * (float)sim->mac.velInterp(sim->particles[i]).y;
         }
     }
     phiCellValues.size = 0;

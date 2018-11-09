@@ -52,7 +52,7 @@ struct WaterSim2D {
     };
 
     StageType stage = StageType::Init;
-    SimMode mode = SimMode::PIC;
+    SimMode mode = SimMode::Eulerian;
 
     void setup(double dt, double dx, double rho, double gravity);
 
@@ -78,6 +78,7 @@ struct WaterSim2D {
 
     double avgPressure();
     double avgPressureInFluid();
+    double maxVelocity();
 
     mathfu::vec2d getGridCenter();
 
@@ -123,7 +124,7 @@ struct WaterSim2D {
     template <typename Fun>
     void fastSweepIterate(Fun f) {
         // Sweep with four possible directions, two times (to make sure)
-        for (int k = 0; k < 2; k++) {
+        for (int k = 0; k < 4; k++) {
             for (size_t j = 0; j < SIZEY; j++) {
                 for (size_t i = 0; i < SIZEX; i++) {
                     f(i, j);
