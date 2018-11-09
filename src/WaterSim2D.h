@@ -42,9 +42,17 @@ struct WaterSim2D {
     double dr = 0.0009; // water particle radius
 
     enum class StageType {
-        Init, CreateLevelSet, UpdateLevelSet, ApplyAdvection, ApplyGravity, ApplyProjection, UpdateCells
+        Init, CreateLevelSet, UpdateLevelSet, TransferVelocityToGrid,
+        ApplySemiLagrangianAdvection, ApplyGravity, ApplyProjection,
+        UpdateVelocity, UpdateParticleVelocities, ApplyAdvection
     };
-    StageType stage;
+
+    enum class SimMode {
+        Eulerian, PIC
+    };
+
+    StageType stage = StageType::Init;
+    SimMode mode = SimMode::PIC;
 
     void setup(double dt, double dx, double rho, double gravity);
 
@@ -52,7 +60,7 @@ struct WaterSim2D {
 
     void update();
 
-    void applyAdvection();
+    void applySemiLagrangianAdvection();
 
     void transferVelocityToGrid();
 
@@ -63,6 +71,8 @@ struct WaterSim2D {
     void updateVelocity();
 
     void updateParticleVelocities();
+
+    void applyAdvection();
 
     mathfu::vec2d clampPos(mathfu::vec2d pos);
 
@@ -142,10 +152,13 @@ struct WaterSim2D {
             case StageType::Init: return "Init";
             case StageType::CreateLevelSet: return "CreateLevelSet";
             case StageType::UpdateLevelSet: return "UpdateLevelSet";
-            case StageType::ApplyAdvection: return "ApplyAdvection";
+            case StageType::TransferVelocityToGrid: return "TransferVelocityToGrid";
+            case StageType::ApplySemiLagrangianAdvection: return "ApplySemiLagrangianAdvection";
             case StageType::ApplyGravity: return "ApplyGravity";
             case StageType::ApplyProjection: return "ApplyProjection";
-            case StageType::UpdateCells: return "UpdateCells";
+            case StageType::UpdateVelocity: return "UpdateVelocity";
+            case StageType::UpdateParticleVelocities: return "UpdateParticleVelocities";
+            case StageType::ApplyAdvection: return "ApplyAdvection";
             default: return nullptr;
         }
     }

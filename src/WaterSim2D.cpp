@@ -68,27 +68,46 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
 }
 
 vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
-    pos.x = utils::clamp(pos.x, (1.0 + 1e-6) * dx, (SIZEX - 1 - 1e-6) * dx);
-    pos.y = utils::clamp(pos.y, (1.0 + 1e-6) * dx, (SIZEY - 1 - 1e-6) * dx);
+    pos.x = utils::clamp(pos.x, (1.0 + 1e-12) * dx, (SIZEX - 1 - 1e-12) * dx);
+    pos.y = utils::clamp(pos.y, (1.0 + 1e-12) * dx, (SIZEY - 1 - 1e-12) * dx);
     return pos;
 }
 
 void WaterSim2D::runFrame() {
-    stage = StageType::CreateLevelSet;
-    createLevelSet();
-    stage = StageType::UpdateLevelSet;
-    updateLevelSet();
-    // stage = StageType::TransferVelocityToGrid;
-    transferVelocityToGrid();
-    stage = StageType::ApplyGravity;
-    applyGravity();
-    stage = StageType::ApplyProjection;
-    applyProjection();
-    updateVelocity();
-    stage = StageType::UpdateCells;
-    updateParticleVelocities();
-    stage = StageType::ApplyAdvection;
-    applyAdvection();
+    if (mode == SimMode::Eulerian) {
+        stage = StageType::CreateLevelSet;
+        createLevelSet();
+        stage = StageType::UpdateLevelSet;
+        updateLevelSet();
+        stage = StageType::ApplySemiLagrangianAdvection;
+        applySemiLagrangianAdvection();
+        stage = StageType::ApplyGravity;
+        applyGravity();
+        stage = StageType::ApplyProjection;
+        applyProjection();
+        stage = StageType::UpdateVelocity;
+        updateVelocity();
+        stage = StageType::ApplyAdvection;
+        applyAdvection();
+    }
+    else if (mode == SimMode::PIC) {
+        stage = StageType::CreateLevelSet;
+        createLevelSet();
+        stage = StageType::UpdateLevelSet;
+        updateLevelSet();
+        stage = StageType::TransferVelocityToGrid;
+        transferVelocityToGrid();
+        stage = StageType::ApplyGravity;
+        applyGravity();
+        stage = StageType::ApplyProjection;
+        applyProjection();
+        stage = StageType::UpdateVelocity;
+        updateVelocity();
+        stage = StageType::UpdateParticleVelocities;
+        updateParticleVelocities();
+        stage = StageType::ApplyAdvection;
+        applyAdvection();
+    }
     rendered = false;
     currentTime += dt;
 }
@@ -132,14 +151,14 @@ void WaterSim2D::update() {
      */
     // runFrame();
     // /*
-    if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
+    // if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
         runFrame();
-    }
+    // }
     // */
 }
 
 double quadraticKernel(double r) {
-    if (r >= -1.5 && r < -0.5) { return 0.5*(r + 1.5)*(r + 15); }
+    if (r >= -1.5 && r < -0.5) { return 0.5*(r + 1.5)*(r + 1.5); }
     else if (r >= -0.5 && r < 0.5) { return 0.75 - r*r; }
     else if (r >= 0.5 && r < 1.5) { return 0.5*(1.5 - r)*(1.5 - r); }
     else return 0;
@@ -152,17 +171,76 @@ void WaterSim2D::transferVelocityToGrid() {
     auto vdiv = new Array2D<double, SIZEX, SIZEY+1>();
     for (int e = 0; e < particles.size; e++) {
         auto& xp = particles[e];
-        auto upos = vec2d(xp.x / dx - 0.5, xp.y / dx);
+        auto upos = vec2d(xp.x / dx, xp.y / dx - 0.5);
         mac.u.distribute(upos, particleVels[e].x);
-        udiv->distribute(upos, 1.0f);
-        auto vpos = vec2d(xp.x / dx, xp.y / dx - 0.5);
+        udiv->distribute(upos, 1.0);
+        auto vpos = vec2d(xp.x / dx - 0.5, xp.y / dx);
         mac.v.distribute(vpos, particleVels[e].y);
-        vdiv->distribute(vpos, 1.0f);
+        vdiv->distribute(vpos, 1.0);
     }
     mac.u.safeDivBy(*udiv);
     mac.v.safeDivBy(*vdiv);
+    auto uintFlag = new Array2D<uint32_t, SIZEX+1, SIZEY>();
+    auto vintFlag = new Array2D<uint32_t, SIZEX, SIZEY+1>();
+    iterateU([&](size_t i, size_t j){
+        (*uintFlag)(i,j) = mac.u(i,j) == 0.0? UINT32_MAX : 0;
+    });
+    iterateV([&](size_t i, size_t j){
+        (*vintFlag)(i,j) = mac.v(i,j) == 0.0? UINT32_MAX : 0;
+    });
+    mac.u.extrapolate(*uintFlag);
+    mac.v.extrapolate(*vintFlag);
+    delete uintFlag;
+    delete vintFlag;
     delete udiv;
     delete vdiv;
+}
+
+
+void WaterSim2D::applySemiLagrangianAdvection() {
+    double C = 5;
+    iterateU([&](size_t i, size_t j) {
+        vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
+        double tau = 0;
+        bool finished = false;
+        while (!finished) {
+            auto k1 = mac.velInterp(x_p);
+            double dtau = C * dx / (k1.Normalize() + 10e-37);
+            if (tau + dtau >= dt) {
+                dtau = dt - tau;
+                finished = true;
+            }
+            else if (tau + 2 * dtau >= dt) {
+                dtau = 0.5 * (dt - tau);
+            }
+            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+            tau += dtau;
+        }
+        mac.u(i,j) = mac.velInterpU(x_p);
+    });
+    iterateV([&](size_t i, size_t j) {
+        vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
+        double tau = 0;
+        bool finished = false;
+        while (!finished) {
+            auto k1 = mac.velInterp(x_p);
+            double dtau = C * dx / (k1.Normalize() + 10e-37);
+            if (tau + dtau >= dt) {
+                dtau = dt - tau;
+                finished = true;
+            }
+            else if (tau + 2 * dtau >= dt) {
+                dtau = 0.5 * (dt - tau);
+            }
+            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+            tau += dtau;
+        }
+        mac.v(i,j) = mac.velInterpV(x_p);
+    });
 }
 
 void WaterSim2D::applyGravity() {
@@ -393,9 +471,9 @@ void WaterSim2D::updateVelocity() {
 
 void WaterSim2D::updateParticleVelocities() {
     for (int e = 0; e < particles.size; e++) {
-        vec2d upos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
+        vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
         double velX = mac.u.extract(upos);
-        vec2d vpos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
+        vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
         double velY = mac.v.extract(vpos);
         particleVels[e] = vec2d(velX, velY);
     }
