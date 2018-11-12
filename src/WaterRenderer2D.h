@@ -33,6 +33,7 @@ private:
 
     GLuint waterCellVAO;
     GLuint solidCellVAO;
+    GLuint cellVelVAO;
     GLuint pressureCellVAO;
     GLuint phiCellVAO;
     GLuint particleVAO;
@@ -41,6 +42,7 @@ private:
     GLuint quadVBO;
     GLuint waterCellOffsetVBO;
     GLuint solidCellOffsetVBO;
+    GLuint cellVelVBO;
     GLuint pressureCellOffsetVBO;
     GLuint pressureCellValueVBO;
     GLuint allCellOffsetVBO;
@@ -52,11 +54,12 @@ private:
     StackVec<vec2fp, SIZEX*SIZEY> waterCellLocations = {};
     StackVec<vec2fp, SIZEX*SIZEY> solidCellLocations = {};
     StackVec<vec2fp, SIZEX*SIZEY> pressureCellLocations = {};
+    StackVec<vec2fp, 2*SIZEX*SIZEY> cellVels = {};
     StackVec<float, SIZEX*SIZEY> pressureCellValues = {};
     StackVec<vec2fp, SIZEX*SIZEY> allCellLocations = {};
     StackVec<float, SIZEX*SIZEY> phiCellValues = {};
 
-    StackVec<vec2fp, 8*SIZEX*SIZEY> particleVelLines = {};
+    StackVec<vec2fp, 2*8*SIZEX*SIZEY> particleVelLines = {};
 
     Shader cellShader;
     Shader particleShader;
@@ -68,6 +71,7 @@ private:
     bool renderParticles = true;
     bool renderParticleVels = true;
     bool renderCells = true;
+    bool renderCellVels = false;
     bool renderPressures = true;
     bool renderLevelSet = false;
 

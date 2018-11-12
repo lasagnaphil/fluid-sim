@@ -48,11 +48,11 @@ struct WaterSim2D {
     };
 
     enum class SimMode {
-        Eulerian, PIC
+        SemiLagrangian, PIC
     };
 
     StageType stage = StageType::Init;
-    SimMode mode = SimMode::Eulerian;
+    SimMode mode = SimMode::PIC;
 
     void setup(double dt, double dx, double rho, double gravity);
 

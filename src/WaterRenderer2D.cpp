@@ -99,6 +99,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
 
     glGenVertexArrays(1, &waterCellVAO);
     glGenVertexArrays(1, &solidCellVAO);
+    glGenVertexArrays(1, &cellVelVAO);
     glGenVertexArrays(1, &pressureCellVAO);
     glGenVertexArrays(1, &phiCellVAO);
     glGenVertexArrays(1, &particleVAO);
@@ -106,6 +107,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glGenBuffers(1, &quadVBO);
     glGenBuffers(1, &waterCellOffsetVBO);
     glGenBuffers(1, &solidCellOffsetVBO);
+    glGenBuffers(1, &cellVelVBO);
     glGenBuffers(1, &pressureCellOffsetVBO);
     glGenBuffers(1, &pressureCellValueVBO);
     glGenBuffers(1, &allCellOffsetVBO);
@@ -137,6 +139,13 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
     glVertexAttribDivisor(1, 1);
+
+    glBindVertexArray(cellVelVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, cellVelVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 2*SIZEX*SIZEY, cellVels.data, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
     glBindVertexArray(pressureCellVAO);
 
@@ -177,14 +186,14 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glBindVertexArray(particleVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 2*8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(vec2fp), 0);
 
     glBindVertexArray(particleVelVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, particleVelVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2fp) * 2*8*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2fp), 0);
 
@@ -205,6 +214,12 @@ void WaterRenderer2D::update() {
             glBindVertexArray(solidCellVAO);
             glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * solidCellLocations.size, solidCellLocations.data);
+            glBindVertexArray(0);
+        }
+        if (renderCellVels) {
+            glBindVertexArray(cellVelVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, cellVelVBO);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vec2fp) * cellVels.size, cellVels.data);
             glBindVertexArray(0);
         }
         if (renderPressures) {
@@ -277,6 +292,12 @@ void WaterRenderer2D::draw() {
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, solidCellLocations.size);
         glBindVertexArray(0);
     }
+    if (renderCellVels) {
+        particleShader.use();
+        glBindVertexArray(cellVelVAO);
+        glDrawArrays(GL_LINES, 0, particleVelLines.size);
+        glBindVertexArray(0);
+    }
     if (renderPressures) {
         cellFieldShader.use();
         cellFieldShader.setVector4("posColor", vec4f(1.0f, 0.0f, 0.0f, 1.0f));
@@ -321,6 +342,7 @@ void WaterRenderer2D::drawUI() {
     ImGui::Text("CFL Number: %f", CFLnum);
 
     ImGui::Checkbox("Render cells", &renderCells);
+    ImGui::Checkbox("Render cell vels", &renderCellVels);
     ImGui::Checkbox("Render pressures", &renderPressures);
     ImGui::Checkbox("Render particles", &renderParticles);
     ImGui::Checkbox("Render particle vels", &renderParticleVels);
@@ -342,6 +364,17 @@ void WaterRenderer2D::updateBuffers() {
                 solidCellLocations.push(vec2fp(i * sim->dx, j * sim->dx));
             }
         });
+    }
+    if (renderCellVels) {
+        cellVels.size = 0;
+        for (size_t j = 0; j < sim->SIZEY - 1; j++) {
+            for (size_t i = 0; i < sim->SIZEX - 1; i++) {
+                vec2d pos = vec2d(i + 0.5,j + 0.5) * sim->dx;
+                vec2d vel = sim->mac.velInterp(pos);
+                cellVels.push(vec2fp(pos.x, pos.y));
+                cellVels.push(vec2fp(pos.x + vel.x * sim->dt, pos.y + vel.y * sim->dt));
+            }
+        }
     }
     if (renderPressures) {
         pressureCellLocations.size = 0;

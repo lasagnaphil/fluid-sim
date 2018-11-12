@@ -240,9 +240,7 @@ struct Array2D {
 
     void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
         using mathfu::vec2i;
-        // TODO: for unknown cells, extrapolate velocity using p.65 (BFS)
-        auto Wu = Queue<vec2i>::create(4*(NX+NY));
-        defer {Wu.free();};
+        auto Wu = std::queue<vec2i>();
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX; i++) {
                 size_t im = i == 0 ? 0 : i - 1;
@@ -252,14 +250,15 @@ struct Array2D {
                 if (intMask(i, j) != 0 &&
                     (intMask(im, j) == 0 || intMask(ip, j) == 0 || intMask(i, jm) == 0 || intMask(i, jp) == 0)) {
                     intMask(i, j) = 1;
-                    Wu.enq(vec2i(i, j));
+                    Wu.push(vec2i(i, j));
                 }
             }
         }
         int counter = 0;
-        while (Wu.size > 0) {
+        while (Wu.size() > 0) {
             counter++;
-            vec2i pos = Wu.deq();
+            vec2i pos = Wu.front();
+            Wu.pop();
             int x = pos.x, y = pos.y;
             double sum = 0.0;
             int count = 0;
@@ -275,7 +274,7 @@ struct Array2D {
                 if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
                 if (intMask(neighbor.x, neighbor.y) == UINT32_MAX) {
                     intMask(neighbor.x, neighbor.y) = intMask(x,y) + 1;
-                    Wu.enq(neighbor);
+                    Wu.push(neighbor);
                 }
             }
         }

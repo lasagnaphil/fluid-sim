@@ -19,14 +19,14 @@ inline double randf() {
 void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     this->dt = dt;
     this->dx = mac.dx = dx;
-    this->dr = 0.9 * dx;
+    this->dr = 0.99 * dx;
     this->rho = rho;
     this->gravity = gravity;
 
     size_t fluidCount = 0;
     iterate([&](size_t i, size_t j) {
-        if (i == 0 || i == SIZEX - 1 ||
-            j == 0 || j == SIZEY - 1) {
+        if (i == 0 || i == 1 || i == SIZEX - 1 || i == SIZEX - 2 ||
+            j == 0 || j == 1 || j == SIZEY - 1 || j == SIZEX - 2) {
             cell(i, j) = CellType::SOLID;
         }
         else if (i + j < SIZEY * 3 / 4) {
@@ -74,13 +74,13 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
 }
 
 vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
-    pos.x = utils::clamp(pos.x, (1.0 + 1e-12) * dx, (SIZEX - 1 - 1e-12) * dx);
-    pos.y = utils::clamp(pos.y, (1.0 + 1e-12) * dx, (SIZEY - 1 - 1e-12) * dx);
+    pos.x = utils::clamp(pos.x, (2.0 + 1e-12) * dx, (SIZEX - 2 - 1e-12) * dx);
+    pos.y = utils::clamp(pos.y, (2.0 + 1e-12) * dx, (SIZEY - 2 - 1e-12) * dx);
     return pos;
 }
 
 void WaterSim2D::runFrame() {
-    if (mode == SimMode::Eulerian) {
+    if (mode == SimMode::SemiLagrangian) {
         stage = StageType::CreateLevelSet;
         createLevelSet();
         stage = StageType::UpdateLevelSet;
@@ -122,43 +122,70 @@ void WaterSim2D::update() {
     auto inputMgr = InputManager::get();
     /*
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
-            stage = StageType::CreateLevelSet;
-            createLevelSet();
+        if (mode == SimMode::SemiLagrangian) {
+            if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
+                stage = StageType::CreateLevelSet;
+                createLevelSet();
+            } else if (stage == StageType::CreateLevelSet) {
+                stage = StageType::UpdateLevelSet;
+                updateLevelSet();
+            } else if (stage == StageType::UpdateLevelSet) {
+                stage = StageType::ApplySemiLagrangianAdvection;
+                applySemiLagrangianAdvection();
+            } else if (stage == StageType::ApplySemiLagrangianAdvection) {
+                stage = StageType::ApplyGravity;
+                applyGravity();
+            } else if (stage == StageType::ApplyGravity) {
+                stage = StageType::ApplyProjection;
+                applyProjection();
+                updateVelocity();
+            } else if (stage == StageType::ApplyProjection) {
+                stage = StageType::UpdateVelocity;
+                updateVelocity();
+            } else if (stage == StageType::UpdateVelocity) {
+                stage = StageType::ApplyAdvection;
+                applyAdvection();
+                currentTime += dt;
+            }
+            rendered = false;
         }
-        else if (stage == StageType::CreateLevelSet) {
-            stage = StageType::UpdateLevelSet;
-            updateLevelSet();
+        else if (mode == SimMode::PIC) {
+            if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
+                stage = StageType::CreateLevelSet;
+                createLevelSet();
+            } else if (stage == StageType::CreateLevelSet) {
+                stage = StageType::UpdateLevelSet;
+                updateLevelSet();
+            } else if (stage == StageType::UpdateLevelSet) {
+                stage = StageType::TransferVelocityToGrid;
+                transferVelocityToGrid();
+            } else if (stage == StageType::TransferVelocityToGrid) {
+                stage = StageType::ApplyGravity;
+                applyGravity();
+            } else if (stage == StageType::ApplyGravity) {
+                stage = StageType::ApplyProjection;
+                applyProjection();
+            } else if (stage == StageType::ApplyProjection) {
+                stage = StageType::UpdateVelocity;
+                updateVelocity();
+            } else if (stage == StageType::UpdateVelocity) {
+                stage = StageType::UpdateParticleVelocities;
+                updateParticleVelocities();
+            } else if (stage == StageType::UpdateParticleVelocities) {
+                stage = StageType::ApplyAdvection;
+                applyAdvection();
+                currentTime += dt;
+            }
+            rendered = false;
         }
-        else if (stage == StageType::UpdateLevelSet) {
-            stage = StageType::ApplySemiLagrangianAdvection;
-            applySemiLagrangianAdvection();
-        }
-        else if (stage == StageType::ApplySemiLagrangianAdvection) {
-            stage = StageType::ApplyGravity;
-            applyGravity();
-        }
-        else if (stage == StageType::ApplyGravity) {
-            stage = StageType::ApplyProjection;
-            applyProjection();
-            updateVelocity();
-        }
-        else if (stage == StageType::ApplyProjection) {
-            stage = StageType::UpdateVelocity;
-            updateVelocity();
-        }
-        else if (stage == StageType::UpdateVelocity) {
-            stage = StageType::ApplyAdvection;
-            applyAdvection();
-            currentTime += dt;
-        }
-        rendered = false;
     }
      */
-    // runFrame();
-    if (inputMgr->isKeyPressed(SDL_SCANCODE_RETURN)) {
+    runFrame();
+    /*
+    if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
         runFrame();
     }
+     */
 }
 
 double quadraticKernel(double r) {
@@ -187,10 +214,10 @@ void WaterSim2D::transferVelocityToGrid() {
     auto uintFlag = new Array2D<uint32_t, SIZEX+1, SIZEY>();
     auto vintFlag = new Array2D<uint32_t, SIZEX, SIZEY+1>();
     iterateU([&](size_t i, size_t j){
-        (*uintFlag)(i,j) = mac.u(i,j) == 0.0? UINT32_MAX : 0;
+        (*uintFlag)(i,j) = (*udiv)(i,j) == 0.0? UINT32_MAX : 0;
     });
     iterateV([&](size_t i, size_t j){
-        (*vintFlag)(i,j) = mac.v(i,j) == 0.0? UINT32_MAX : 0;
+        (*vintFlag)(i,j) = (*vdiv)(i,j) == 0.0? UINT32_MAX : 0;
     });
     mac.u.extrapolate(*uintFlag);
     mac.v.extrapolate(*vintFlag);
@@ -209,7 +236,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Normalize() + 10e-37);
+            double dtau = C * dx / (k1.Length() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -230,7 +257,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
         bool finished = false;
         while (!finished) {
             auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Normalize() + 10e-37);
+            double dtau = C * dx / (k1.Length() + 10e-37);
             if (tau + dtau >= dt) {
                 dtau = dt - tau;
                 finished = true;
@@ -423,12 +450,12 @@ void WaterSim2D::updateVelocity() {
         double scale = dt / (rho * dx);
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t i = 0; i < SIZEX; i++) {
-                if (cell(i-1,j) == CellType::FLUID || cell(i,j) == CellType::FLUID) {
-                    if (cell(i-1,j) == CellType::SOLID || cell(i,j) == CellType::SOLID) {
+                if ((i > 0 && cell(i-1,j) == CellType::FLUID) || cell(i,j) == CellType::FLUID) {
+                    if ((i == 0 || cell(i-1,j) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
                         mac.u(i,j) = 0; // usolid(i,j);
                     }
                     /*
-                    else if (cell(i-1,j) == CellType::EMPTY) {
+                    else if (i > 0 && cell(i-1,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         mac.u(i,j) -= scale * utils::min((phi(i,j) - phi(i-1,j)) / phi(i,j), 1e3) * p(i,j);
                     }
@@ -437,20 +464,23 @@ void WaterSim2D::updateVelocity() {
                         mac.u(i,j) -= scale * utils::min((phi(i,j) - phi(i-1,j)) / phi(i-1,j), 1e3) * p(i-1,j);
                     }
                      */
-                    else {
+                    else if (i > 0) {
                         mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
+                    }
+                    else {
+                        mac.u(i,j) = 0; // usolid(0,j)
                     }
                 }
                 else {
                     // mark as unknown?
                     (*du)(i,j) = UINT32_MAX;
                 }
-                if ((cell(i,j-1) == CellType::FLUID || cell(i,j) == CellType::FLUID)) {
-                    if (cell(i,j-1) == CellType::SOLID || cell(i,j) == CellType::SOLID) {
-                        mac.v(i,j) = 0;
+                if ((j > 0 && cell(i,j-1) == CellType::FLUID) || cell(i,j) == CellType::FLUID) {
+                    if ((j == 0 || cell(i,j-1) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
+                        mac.v(i,j) = 0; // vsolid(i,0)
                     }
                     /*
-                    else if (cell(i,j-1) == CellType::EMPTY) {
+                    else if (j > 0 && cell(i,j-1) == CellType::EMPTY) {
                         // account for ghost pressures
                         mac.v(i,j) -= scale * utils::min((phi(i,j) - phi(i,j-1)) / phi(i,j), 1e3) * p(i,j);
                     }
@@ -459,8 +489,11 @@ void WaterSim2D::updateVelocity() {
                         mac.v(i,j) -= scale * utils::min((phi(i,j) - phi(i,j-1)) / phi(i,j-1), 1e3) * p(i,j-1);
                     }
                      */
-                    else {
+                    else if (j > 0) {
                         mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
+                    }
+                    else {
+                        mac.v(i,j) = 0; // vsolid(i,0)
                     }
                 }
                 else {
@@ -482,6 +515,10 @@ void WaterSim2D::updateParticleVelocities() {
         vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
         double velY = mac.v.extract(vpos);
         particleVels[e] = vec2d(velX, velY);
+        double velSize = particleVels[e].Length();
+        if (velSize >= 5 * dx / dt) {
+            log_warn("Particle velocity violates CFL condition! (vel=%f, pos=(%f, %f))", velSize, particles[e].x, particles[e].y);
+        }
     }
 }
 
@@ -535,7 +572,7 @@ double WaterSim2D::maxVelocity() {
     double maxVel = 0.0f;
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
-            double vel = mac.velInterp(vec2d(i,j)*dx).Normalize();
+            double vel = mac.velInterp(vec2d(i,j)*dx).Length();
             if (vel > maxVel) maxVel = vel;
         }
     });
@@ -596,19 +633,24 @@ void WaterSim2D::updateLevelSet() {
     oldPhi->copyFrom(phi);
     for (size_t j = 0; j < SIZEY - 1; j++) {
         for (size_t i = 0; i < SIZEX - 1; i++) {
-            if ((*oldPhi)(i,j) * (*oldPhi)(i+1,j) < 0.0) {
+            using utils::sgn;
+            if (sgn((*oldPhi)(i,j)) * sgn((*oldPhi)(i+1,j)) < 0) {
                 double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i+1,j));
                 double theta2 = (*oldPhi)(i+1,j) / ((*oldPhi)(i+1,j) - (*oldPhi)(i,j));
-                phi(i,j) = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
-                phi(i+1,j) = utils::sgn((*oldPhi)(i+1,j)) * theta2 * dx;
+                double phi0 = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
+                if (abs(phi0) < abs(phi(i,j))) phi(i,j) = phi0;
+                double phi1 = utils::sgn((*oldPhi)(i+1,j)) * theta2 * dx;
+                if (abs(phi1) < abs(phi(i+1,j))) phi(i+1,j) = phi1;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i+1,j) = true;
             }
-            if ((*oldPhi)(i,j) * (*oldPhi)(i,j+1) < 0.0) {
+            if (sgn((*oldPhi)(i,j)) * sgn((*oldPhi)(i,j+1)) < 0) {
                 double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i,j+1));
                 double theta2 = (*oldPhi)(i,j+1) / ((*oldPhi)(i,j+1) - (*oldPhi)(i,j));
-                phi(i,j) = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
-                phi(i,j+1) = utils::sgn((*oldPhi)(i,j+1)) * theta2 * dx;
+                double phi0 = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
+                if (abs(phi0) < abs(phi(i,j))) phi(i,j) = phi0;
+                double phi2 = utils::sgn((*oldPhi)(i,j+1)) * theta2 * dx;
+                if (abs(phi2) < abs(phi(i,j+1))) phi(i,j+1) = phi2;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i,j+1) = true;
             }
@@ -623,60 +665,61 @@ void WaterSim2D::updateLevelSet() {
         }
     }
 
-    for (int k = 0; k < 8; k++) {
-        oldPhi->copyFrom(phi);
-        for (size_t j = 0; j < SIZEY - 1; j++) {
-            for (size_t i = 0; i < SIZEX - 1; i++) {
-                double phi0 = utils::min(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j+1)));
-                double phi1 = utils::max(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j+1)));
+    using utils::sgn;
+    for (int k = 0; k < 4; k++) {
+        for (size_t j = 1; j < SIZEY; j++) {
+            for (size_t i = 1; i < SIZEX; i++) {
+                if (phi(i,j) >= 0) continue;
+                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j-1)));
+                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
+                    phi(i,j) = sgn(phi(i,j)) * d;
                 }
             }
         }
-        oldPhi->copyFrom(phi);
-        for (size_t j = 0; j < SIZEY - 1; j++) {
-            for (size_t i = SIZEX; i-- > 1;) {
-                double phi0 = utils::min(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j+1)));
-                double phi1 = utils::max(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j+1)));
+        for (size_t j = 1; j < SIZEY; j++) {
+            for (size_t i = SIZEX - 1; i-- > 0;) {
+                if (phi(i,j) >= 0) continue;
+                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j-1)));
+                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
+                    phi(i,j) = sgn(phi(i,j)) * d;
                 }
             }
         }
-        oldPhi->copyFrom(phi);
-        for (size_t j = SIZEY; j-- > 1;) {
-            for (size_t i = 0; i < SIZEX - 1; i++) {
-                double phi0 = utils::min(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j-1)));
-                double phi1 = utils::max(abs((*oldPhi)(i+1,j)), abs((*oldPhi)(i,j-1)));
+        for (size_t j = SIZEY - 1; j-- > 0;) {
+            for (size_t i = 1; i < SIZEX; i++) {
+                if (phi(i,j) >= 0) continue;
+                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j+1)));
+                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
+                    phi(i,j) = sgn(phi(i,j)) * d;
                 }
             }
         }
-        oldPhi->copyFrom(phi);
-        for (size_t j = SIZEY; j-- > 1;) {
-            for (size_t i = SIZEX; i-- > 1;) {
-                double phi0 = utils::min(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j-1)));
-                double phi1 = utils::max(abs((*oldPhi)(i-1,j)), abs((*oldPhi)(i,j-1)));
+        for (size_t j = SIZEY - 1; j-- > 0;) {
+            for (size_t i = SIZEX - 1; i-- > 0;) {
+                if (phi(i,j) >= 0) continue;
+                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
+                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
                 if (d < abs(phi(i,j))) {
-                    phi(i,j) = utils::sgn((*oldPhi)(i,j)) * d;
+                    phi(i,j) = sgn(phi(i,j)) * d;
                 }
             }
         }
@@ -690,7 +733,7 @@ void WaterSim2D::updateLevelSet() {
             size_t ip = i == SIZEX-1? SIZEX-1 : i+1;
             size_t jp = j == SIZEY-1? SIZEY-1 : j+1;
             double avg = 0.25 * ((*oldPhi)(im,j) + (*oldPhi)(ip,j) + (*oldPhi)(i,jm) + (*oldPhi)(i,jp));
-            if (avg < phi(i,j))
+            if (avg < (*oldPhi)(i,j))
                 phi(i,j) = avg;
         }
     }
