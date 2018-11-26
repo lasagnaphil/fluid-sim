@@ -12,8 +12,8 @@
 
 using namespace mathfu;
 
-inline double randf() {
-    return ((double)rand()/(double)RAND_MAX) * 0.5;
+inline double randf(float max) {
+    return ((double)rand()/(double)RAND_MAX) * max;
 }
 
 void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
@@ -55,18 +55,20 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     cell(65,14) = CellType::SOLID;
      */
 
-    particles.reserve(4*fluidCount);
+    particles.reserve(PARTICLES_PER_CELL*fluidCount);
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
-            particles.push(vec2d((double)i + randf(), (double)j + randf()) * dx);
-            particles.push(vec2d((double)i + 0.5 + randf(), (double)j + randf()) * dx);
-            particles.push(vec2d((double)i + randf(), (double)j + 0.5 + randf()) * dx);
-            particles.push(vec2d((double)i + 0.5 + randf(), (double)j + 0.5 + randf()) * dx);
+            for (int k = 0; k < PARTICLES_PER_CELL; k++) {
+                constexpr float dist = 1.0f / PARTICLES_PER_CELL_SQRT;
+                int x = k % PARTICLES_PER_CELL_SQRT;
+                int y = k / PARTICLES_PER_CELL_SQRT;
+                particles.push(vec2d(((double) i + dist * x + randf(dist)) * dx, ((double) j + dist * y + randf(dist)) * dx));
+            }
         }
     });
 
-    particleVels.resize(4*fluidCount);
-    for (int i = 0; i < 4*fluidCount; i++) {
+    particleVels.resize(PARTICLES_PER_CELL*fluidCount);
+    for (int i = 0; i < PARTICLES_PER_CELL*fluidCount; i++) {
         particleVels[i] = vec2d(0.0, 0.0);
     }
 
@@ -541,6 +543,17 @@ void WaterSim2D::applyAdvection() {
         int x = (int)(pos.x/dx), y = (int)(pos.y/dx);
         if (cell(x,y) == CellType::EMPTY) {
             cell(x,y) = CellType::FLUID;
+        }
+    }
+
+    // Correction to eliminate "bubbles" inside fluids
+    for (size_t i = 1; i < SIZEX - 1; i++) {
+        for (size_t j = 1; j < SIZEY - 1; j++) {
+            if (cell(i, j) == CellType::EMPTY &&
+                cell(i-1, j) == CellType::FLUID && cell(i+1, j) == CellType::FLUID &&
+                cell(i, j-1) == CellType::FLUID && cell(i, j+1) == CellType::FLUID) {
+                cell(i, j) = CellType::FLUID;
+            }
         }
     }
 }

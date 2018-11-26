@@ -16,6 +16,10 @@
 struct WaterSim2D {
     static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
+    static constexpr int PARTICLES_PER_CELL_SQRT = WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT;
+#define SQR(x) ((x)*(x))
+    static constexpr int PARTICLES_PER_CELL = SQR(WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT);
+#undef SQR
 
     template <typename T>
     using Grid2D = Array2D<T, SIZEX, SIZEY>;

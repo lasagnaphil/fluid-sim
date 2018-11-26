@@ -30,6 +30,10 @@ class WaterRenderer2D {
 private:
     static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
+    static constexpr int PARTICLES_PER_CELL_SQRT = WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT;
+#define SQR(x) ((x)*(x))
+    static constexpr int PARTICLES_PER_CELL = SQR(WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT);
+#undef SQR
 
     GLuint waterCellVAO;
     GLuint solidCellVAO;
@@ -59,7 +63,7 @@ private:
     StackVec<vec2fp, SIZEX*SIZEY> allCellLocations = {};
     StackVec<float, SIZEX*SIZEY> phiCellValues = {};
 
-    StackVec<vec2fp, 2*8*SIZEX*SIZEY> particleVelLines = {};
+    StackVec<vec2fp, 2*PARTICLES_PER_CELL*SIZEX*SIZEY> particleVelLines = {};
 
     Shader cellShader;
     Shader particleShader;
