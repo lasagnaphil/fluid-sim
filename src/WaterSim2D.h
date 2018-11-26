@@ -123,8 +123,18 @@ struct WaterSim2D {
     }
 
     template <typename Fun>
+    void iterateParallel(Fun f) {
+#pragma omp parallel for
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                f(i, j);
+            }
+        }
+    }
+
+    template <typename Fun>
     void iterateBackwards(Fun f) {
-        for (size_t j = SIZEY; j-- > 0;) {
+        for (int j = SIZEY; j >= 0; j--) {
             for (size_t i = SIZEX; i-- > 0;) {
                 f(i, j);
             }
@@ -145,12 +155,12 @@ struct WaterSim2D {
                     f(i, j);
                 }
             }
-            for (size_t j = SIZEY; j-- > 0;) {
+            for (size_t j = SIZEY; j >= 0; j--) {
                 for (size_t i = 0; i < SIZEX; i++) {
                     f(i, j);
                 }
             }
-            for (size_t j = SIZEY; j-- > 0;) {
+            for (size_t j = SIZEY; j >= 0; j--) {
                 for (size_t i = SIZEX; i-- > 0;) {
                     f(i, j);
                 }

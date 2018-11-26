@@ -137,6 +137,7 @@ void WaterSim2D::runFrame() {
     rendered = false;
     currentTime += dt;
     perfCounter.endFrame();
+#undef STOPWATCH
 }
 
 void WaterSim2D::update() {
@@ -251,54 +252,65 @@ void WaterSim2D::transferVelocityToGrid() {
 
 void WaterSim2D::applySemiLagrangianAdvection() {
     double C = 5;
-    iterateU([&](size_t i, size_t j) {
-        vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
-        double tau = 0;
-        bool finished = false;
-        while (!finished) {
-            auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Length() + 10e-37);
-            if (tau + dtau >= dt) {
-                dtau = dt - tau;
-                finished = true;
+
+#pragma omp parallel for
+    for (int j = 0; j < SIZEY; j++) {
+        for (int i = 0; i < SIZEX + 1; i++) {
+            vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
+            double tau = 0;
+            bool finished = false;
+            while (!finished) {
+                auto k1 = mac.velInterp(x_p);
+                double dtau = C * dx / (k1.Length() + 10e-37);
+                if (tau + dtau >= dt) {
+                    dtau = dt - tau;
+                    finished = true;
+                }
+                else if (tau + 2 * dtau >= dt) {
+                    dtau = 0.5 * (dt - tau);
+                }
+                auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+                auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+                x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+                tau += dtau;
             }
-            else if (tau + 2 * dtau >= dt) {
-                dtau = 0.5 * (dt - tau);
-            }
-            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-            tau += dtau;
+            mac.u(i,j) = mac.velInterpU(x_p);
         }
-        mac.u(i,j) = mac.velInterpU(x_p);
-    });
-    iterateV([&](size_t i, size_t j) {
-        vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
-        double tau = 0;
-        bool finished = false;
-        while (!finished) {
-            auto k1 = mac.velInterp(x_p);
-            double dtau = C * dx / (k1.Length() + 10e-37);
-            if (tau + dtau >= dt) {
-                dtau = dt - tau;
-                finished = true;
+    }
+
+#pragma omp parallel for
+    for (int j = 0; j < SIZEY + 1; j++) {
+        for (int i = 0; i < SIZEX; i++) {
+            vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
+            double tau = 0;
+            bool finished = false;
+            while (!finished) {
+                auto k1 = mac.velInterp(x_p);
+                double dtau = C * dx / (k1.Length() + 10e-37);
+                if (tau + dtau >= dt) {
+                    dtau = dt - tau;
+                    finished = true;
+                }
+                else if (tau + 2 * dtau >= dt) {
+                    dtau = 0.5 * (dt - tau);
+                }
+                auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
+                auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
+                x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
+                tau += dtau;
             }
-            else if (tau + 2 * dtau >= dt) {
-                dtau = 0.5 * (dt - tau);
-            }
-            auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-            auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-            x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-            tau += dtau;
+            mac.v(i,j) = mac.velInterpV(x_p);
         }
-        mac.v(i,j) = mac.velInterpV(x_p);
-    });
+    }
 }
 
 void WaterSim2D::applyGravity() {
-    iterateV([&](size_t i, size_t j) {
-        mac.v(i,j) += dt * gravity;
-    });
+#pragma omp parallel for
+    for (int j = 0; j < SIZEY + 1; j++) {
+        for (int i = 0; i < SIZEX; i++) {
+            mac.v(i,j) += dt * gravity;
+        }
+    }
 }
 
 void WaterSim2D::applyProjection() {
@@ -310,7 +322,7 @@ void WaterSim2D::applyProjection() {
 
     // calculate lhs (matrix A)
     double scaleA = dt / (rho * dx * dx);
-    iterate([&](size_t i, size_t j) {
+    iterateParallel([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
             if (cell(i-1,j) == CellType::FLUID) {
                 Adiag(i,j) += scaleA;
@@ -619,10 +631,10 @@ void WaterSim2D::createLevelSet() {
     auto* t = new Grid2D<size_t>();
     defer {delete t;};
 
-    iterate([&](size_t i, size_t j) {
+    iterateParallel([&](size_t i, size_t j) {
         phi(i,j) = HUGE_VAL;
     });
-    iterate([&](size_t i, size_t j) {
+    iterateParallel([&](size_t i, size_t j) {
         (*t)(i,j) = (size_t)-1;
     });
     for (size_t e = 0; e < particles.size; e++) {
