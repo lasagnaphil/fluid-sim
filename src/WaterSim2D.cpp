@@ -17,6 +17,15 @@ inline double randf(float max) {
 }
 
 void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
+
+    if (mode == SimMode::SemiLagrangian) {
+        numStages = 7;
+    }
+    else if (mode == SimMode::PIC) {
+        numStages = 8;
+    }
+
+    perfCounter = PerformanceCounter::create(numStages);
     this->dt = dt;
     this->dx = mac.dx = dx;
     this->dr = 0.99 * dx;
@@ -75,6 +84,10 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     createLevelSet();
 }
 
+void WaterSim2D::free() {
+    perfCounter.free();
+}
+
 vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
     pos.x = utils::clamp(pos.x, (2.0 + 1e-12) * dx, (SIZEX - 2 - 1e-12) * dx);
     pos.y = utils::clamp(pos.y, (2.0 + 1e-12) * dx, (SIZEY - 2 - 1e-12) * dx);
@@ -82,42 +95,48 @@ vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
 }
 
 void WaterSim2D::runFrame() {
+#define STOPWATCH(__CODE) \
+    perfCounter.beginStage(); \
+    __CODE; \
+    perfCounter.endStage();
+
     if (mode == SimMode::SemiLagrangian) {
         stage = StageType::CreateLevelSet;
-        createLevelSet();
+        STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        updateLevelSet();
+        STOPWATCH(updateLevelSet());
         stage = StageType::ApplySemiLagrangianAdvection;
-        applySemiLagrangianAdvection();
+        STOPWATCH(applySemiLagrangianAdvection());
         stage = StageType::ApplyGravity;
-        applyGravity();
+        STOPWATCH(applyGravity());
         stage = StageType::ApplyProjection;
-        applyProjection();
+        STOPWATCH(applyProjection());
         stage = StageType::UpdateVelocity;
-        updateVelocity();
+        STOPWATCH(updateVelocity());
         stage = StageType::ApplyAdvection;
-        applyAdvection();
+        STOPWATCH(applyAdvection());
     }
     else if (mode == SimMode::PIC) {
         stage = StageType::CreateLevelSet;
-        createLevelSet();
+        STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        updateLevelSet();
+        STOPWATCH(updateLevelSet());
         stage = StageType::TransferVelocityToGrid;
-        transferVelocityToGrid();
+        STOPWATCH(transferVelocityToGrid());
         stage = StageType::ApplyGravity;
-        applyGravity();
+        STOPWATCH(applyGravity());
         stage = StageType::ApplyProjection;
-        applyProjection();
+        STOPWATCH(applyProjection());
         stage = StageType::UpdateVelocity;
-        updateVelocity();
+        STOPWATCH(updateVelocity());
         stage = StageType::UpdateParticleVelocities;
-        updateParticleVelocities();
+        STOPWATCH(updateParticleVelocities());
         stage = StageType::ApplyAdvection;
-        applyAdvection();
+        STOPWATCH(applyAdvection());
     }
     rendered = false;
     currentTime += dt;
+    perfCounter.endFrame();
 }
 
 void WaterSim2D::update() {

@@ -158,6 +158,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
 
 void App::free() {
     if (mode == Mode::Dim2) {
+        waterSim2D->free();
         delete waterSim2D;
         delete waterRenderer2D;
     }

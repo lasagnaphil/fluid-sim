@@ -12,6 +12,7 @@
 
 #include "Array2D.h"
 #include "MACGrid2D.h"
+#include "PerformanceCounter.h"
 
 struct WaterSim2D {
     static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
@@ -50,15 +51,20 @@ struct WaterSim2D {
         ApplySemiLagrangianAdvection, ApplyGravity, ApplyProjection,
         UpdateVelocity, UpdateParticleVelocities, ApplyAdvection
     };
+    int numStages;
 
     enum class SimMode {
         SemiLagrangian, PIC
     };
 
     StageType stage = StageType::Init;
-    SimMode mode = SimMode::PIC;
+    SimMode mode = SimMode::SemiLagrangian;
+
+    PerformanceCounter perfCounter;
 
     void setup(double dt, double dx, double rho, double gravity);
+
+    void free();
 
     void runFrame();
 

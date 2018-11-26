@@ -332,21 +332,27 @@ void WaterRenderer2D::draw() {
 
 void WaterRenderer2D::drawUI() {
     ImGui::Begin("Water Simulation");
-    ImGui::Text("Current frame: %f", sim->currentTime);
-    ImGui::Text("Current stage: %s", sim->printStage());
-    ImGui::Text("Average pressure: %f", sim->avgPressure());
-    ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
-    double maxVelocity = sim->maxVelocity();
-    ImGui::Text("Max velocity in fluid: %f", maxVelocity);
-    double CFLnum = sim->dt * maxVelocity / sim->dx;
-    ImGui::Text("CFL Number: %f", CFLnum);
-
-    ImGui::Checkbox("Render cells", &renderCells);
-    ImGui::Checkbox("Render cell vels", &renderCellVels);
-    ImGui::Checkbox("Render pressures", &renderPressures);
-    ImGui::Checkbox("Render particles", &renderParticles);
-    ImGui::Checkbox("Render particle vels", &renderParticleVels);
-    ImGui::Checkbox("Render level set", &renderLevelSet);
+    if (ImGui::CollapsingHeader("Data")) {
+        ImGui::Text("Current frame: %f", sim->currentTime);
+        ImGui::Text("Current stage: %s", sim->printStage());
+        ImGui::Text("Average pressure: %f", sim->avgPressure());
+        ImGui::Text("Average pressure in fluid: %f", sim->avgPressureInFluid());
+        double maxVelocity = sim->maxVelocity();
+        ImGui::Text("Max velocity in fluid: %f", maxVelocity);
+        double CFLnum = sim->dt * maxVelocity / sim->dx;
+        ImGui::Text("CFL Number: %f", CFLnum);
+    }
+    if (ImGui::CollapsingHeader("Options")) {
+        ImGui::Checkbox("Render cells", &renderCells);
+        ImGui::Checkbox("Render cell vels", &renderCellVels);
+        ImGui::Checkbox("Render pressures", &renderPressures);
+        ImGui::Checkbox("Render particles", &renderParticles);
+        ImGui::Checkbox("Render particle vels", &renderParticleVels);
+        ImGui::Checkbox("Render level set", &renderLevelSet);
+    }
+    if (ImGui::CollapsingHeader("Performance")) {
+        sim->perfCounter.renderUI();
+    }
 
     ImGui::End();
 }
