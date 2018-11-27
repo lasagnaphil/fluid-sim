@@ -102,9 +102,11 @@ void WaterSim2D::runFrame() {
 
     if (mode == SimMode::SemiLagrangian) {
         stage = StageType::CreateLevelSet;
-        STOPWATCH(createLevelSet());
+        STOPWATCH();
+        // STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        STOPWATCH(updateLevelSet());
+        STOPWATCH();
+        // STOPWATCH(updateLevelSet());
         stage = StageType::ApplySemiLagrangianAdvection;
         STOPWATCH(applySemiLagrangianAdvection());
         stage = StageType::ApplyGravity;
@@ -118,9 +120,11 @@ void WaterSim2D::runFrame() {
     }
     else if (mode == SimMode::PIC) {
         stage = StageType::CreateLevelSet;
-        STOPWATCH(createLevelSet());
+        STOPWATCH();
+        // STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        STOPWATCH(updateLevelSet());
+        STOPWATCH();
+        // STOPWATCH(updateLevelSet());
         stage = StageType::TransferVelocityToGrid;
         STOPWATCH(transferVelocityToGrid());
         stage = StageType::ApplyGravity;
@@ -257,23 +261,10 @@ void WaterSim2D::applySemiLagrangianAdvection() {
     for (int j = 0; j < SIZEY; j++) {
         for (int i = 0; i < SIZEX + 1; i++) {
             vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
-            double tau = 0;
-            bool finished = false;
-            while (!finished) {
-                auto k1 = mac.velInterp(x_p);
-                double dtau = C * dx / (k1.Length() + 10e-37);
-                if (tau + dtau >= dt) {
-                    dtau = dt - tau;
-                    finished = true;
-                }
-                else if (tau + 2 * dtau >= dt) {
-                    dtau = 0.5 * (dt - tau);
-                }
-                auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-                auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-                x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-                tau += dtau;
-            }
+            auto k1 = mac.velInterp(x_p);
+            auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
+            x_p -= (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
             mac.u(i,j) = mac.velInterpU(x_p);
         }
     }
@@ -282,23 +273,10 @@ void WaterSim2D::applySemiLagrangianAdvection() {
     for (int j = 0; j < SIZEY + 1; j++) {
         for (int i = 0; i < SIZEX; i++) {
             vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
-            double tau = 0;
-            bool finished = false;
-            while (!finished) {
-                auto k1 = mac.velInterp(x_p);
-                double dtau = C * dx / (k1.Length() + 10e-37);
-                if (tau + dtau >= dt) {
-                    dtau = dt - tau;
-                    finished = true;
-                }
-                else if (tau + 2 * dtau >= dt) {
-                    dtau = 0.5 * (dt - tau);
-                }
-                auto k2 = mac.velInterp(x_p - 0.5*dtau*k1);
-                auto k3 = mac.velInterp(x_p - 0.75*dtau*k2);
-                x_p -= (2./9.)*dtau*k1 + (3./9.)*dtau*k2 + (4./9.)*dtau*k3;
-                tau += dtau;
-            }
+            auto k1 = mac.velInterp(x_p);
+            auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
+            auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
+            x_p -= (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
             mac.v(i,j) = mac.velInterpV(x_p);
         }
     }
