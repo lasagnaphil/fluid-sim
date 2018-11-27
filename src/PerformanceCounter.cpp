@@ -39,6 +39,11 @@ void PerformanceCounter::endFrame() {
     currentStage = 0;
     if (currentFrame == SampleCount - 1) sampleFinished = true;
     currentFrame = (currentFrame + 1) % SampleCount;
+
+    avgTimePerFrame = 0.0f;
+    for (int i = 0; i < average.size; i++) {
+        avgTimePerFrame += average[i];
+    }
 }
 
 void PerformanceCounter::renderUI() {
@@ -46,6 +51,7 @@ void PerformanceCounter::renderUI() {
         for (int i = 0; i < average.size; i++) {
             ImGui::Text("Stage %d: %f ms", i, average[i]);
         }
+        ImGui::Text("Avg time per frame: %f ms", avgTimePerFrame);
     } else {
         ImGui::Text("Sampling frames...");
     }
