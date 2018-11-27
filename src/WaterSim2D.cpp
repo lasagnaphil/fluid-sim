@@ -239,12 +239,18 @@ void WaterSim2D::transferVelocityToGrid() {
     mac.v.safeDivBy(*vdiv);
     auto uintFlag = new Array2D<uint32_t, SIZEX+1, SIZEY>();
     auto vintFlag = new Array2D<uint32_t, SIZEX, SIZEY+1>();
-    iterateU([&](size_t i, size_t j){
-        (*uintFlag)(i,j) = (*udiv)(i,j) == 0.0? UINT32_MAX : 0;
-    });
-    iterateV([&](size_t i, size_t j){
-        (*vintFlag)(i,j) = (*vdiv)(i,j) == 0.0? UINT32_MAX : 0;
-    });
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX + 1; i++) {
+            (*uintFlag)(i,j) = mac.u(i,j) == 0.0? UINT32_MAX : 0;
+        }
+    }
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY + 1; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            (*vintFlag)(i,j) = mac.v(i,j) == 0.0? UINT32_MAX : 0;
+        }
+    }
     mac.u.extrapolate(*uintFlag);
     mac.v.extrapolate(*vintFlag);
     delete uintFlag;

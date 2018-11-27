@@ -286,12 +286,12 @@ struct alignas(32) Array2D<double, NX, NY> {
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
         auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
-        double kx1 = (0.5 - disp.x) * (0.5 - disp.x);
+        double kx1 = 0.5 * (0.5 - disp.x) * (0.5 - disp.x);
         double kx2 = (0.75 - disp.x * disp.x);
-        double kx3 = 0.75 - (1.0 - disp.x) * (1.0 - disp.x);
-        double ky1 = (0.5 - disp.y) * (0.5 - disp.y);
+        double kx3 = 0.5 * (0.5 + disp.x) * (0.5 + disp.x);
+        double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
-        double ky3 = 0.75 - (1.0 - disp.y) * (1.0 - disp.y);
+        double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
         if (disp.x < 0.5 && disp.y < 0.5) {
             (*this)(ui - 1, uj - 1) += kx1 * ky1 * value;
             (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
@@ -303,7 +303,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
             (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
         }
-        else if (disp.x > 0.5 && disp.y < 0.5) {
+        else if (disp.x >= 0.5 && disp.y < 0.5) {
             (*this)(ui    , uj - 1) += kx2 * ky1 * value;
             (*this)(ui    , uj    ) += kx2 * ky2 * value;
             (*this)(ui    , uj + 1) += kx2 * ky3 * value;
@@ -314,7 +314,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             (*this)(ui + 2, uj    ) += kx1 * ky2 * value;
             (*this)(ui + 2, uj + 1) += kx1 * ky3 * value;
         }
-        else if (disp.x < 0.5 && disp.y > 0.5) {
+        else if (disp.x < 0.5 && disp.y >= 0.5) {
             (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
             (*this)(ui - 1, uj + 1) += kx1 * ky3 * value;
             (*this)(ui - 1, uj + 2) += kx1 * ky1 * value;
@@ -325,7 +325,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
             (*this)(ui + 1, uj + 2) += kx3 * ky1 * value;
         }
-        else if (disp.x > 0.5 && disp.y > 0.5) {
+        else if (disp.x >= 0.5 && disp.y >= 0.5) {
             (*this)(ui    , uj    ) += kx2 * ky2 * value;
             (*this)(ui    , uj + 1) += kx2 * ky3 * value;
             (*this)(ui    , uj + 2) += kx2 * ky1 * value;
@@ -339,16 +339,16 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     double extract(mathfu::vec2d pos) {
-        double value = (double) 0;
+        double value = 0.0;
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
         auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
-        double kx1 = (0.5 - disp.x) * (0.5 - disp.x);
+        double kx1 = 0.5 * (0.5 - disp.x) * (0.5 - disp.x);
         double kx2 = (0.75 - disp.x * disp.x);
-        double kx3 = 0.75 - (1.0 - disp.x) * (1.0 - disp.x);
-        double ky1 = (0.5 - disp.y) * (0.5 - disp.y);
+        double kx3 = 0.5 * (0.5 + disp.x) * (0.5 + disp.x);
+        double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
-        double ky3 = 0.75 - (1.0 - disp.y) * (1.0 - disp.y);
+        double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
         if (disp.x < 0.5 && disp.y < 0.5) {
             value += kx1 * ky1 * (*this)(ui - 1, uj - 1);
             value += kx1 * ky2 * (*this)(ui - 1, uj    );
@@ -360,7 +360,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             value += kx3 * ky2 * (*this)(ui + 1, uj    );
             value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
         }
-        else if (disp.x > 0.5 && disp.y < 0.5) {
+        else if (disp.x >= 0.5 && disp.y < 0.5) {
             value += kx2 * ky1 * (*this)(ui    , uj - 1);
             value += kx2 * ky2 * (*this)(ui    , uj    );
             value += kx2 * ky3 * (*this)(ui    , uj + 1);
@@ -371,7 +371,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             value += kx1 * ky2 * (*this)(ui + 2, uj    );
             value += kx1 * ky3 * (*this)(ui + 2, uj + 1);
         }
-        else if (disp.x < 0.5 && disp.y > 0.5) {
+        else if (disp.x < 0.5 && disp.y >= 0.5) {
             value += kx1 * ky2 * (*this)(ui - 1, uj    );
             value += kx1 * ky3 * (*this)(ui - 1, uj + 1);
             value += kx1 * ky1 * (*this)(ui - 1, uj + 2);
@@ -382,7 +382,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
             value += kx3 * ky1 * (*this)(ui + 1, uj + 2);
         }
-        else if (disp.x > 0.5 && disp.y > 0.5) {
+        else if (disp.x >= 0.5 && disp.y >= 0.5) {
             value += kx2 * ky2 * (*this)(ui    , uj    );
             value += kx2 * ky3 * (*this)(ui    , uj + 1);
             value += kx2 * ky1 * (*this)(ui    , uj + 2);
@@ -399,22 +399,16 @@ struct alignas(32) Array2D<double, NX, NY> {
     void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
         using mathfu::vec2i;
         auto Wu = std::queue<vec2i>();
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX; i++) {
-                size_t im = i == 0 ? 0 : i - 1;
-                size_t ip = i == NX - 1 ? NX - 1 : i + 1;
-                size_t jm = j == 0 ? 0 : j - 1;
-                size_t jp = j == NY - 1 ? NY - 1 : j + 1;
+        for (size_t j = 1; j < NY-1; j++) {
+            for (size_t i = 1; i < NX-1; i++) {
                 if (intMask(i, j) != 0 &&
-                    (intMask(im, j) == 0 || intMask(ip, j) == 0 || intMask(i, jm) == 0 || intMask(i, jp) == 0)) {
+                    (intMask(i-1, j) == 0 || intMask(i+1, j) == 0 || intMask(i, j-1) == 0 || intMask(i, j+1) == 0)) {
                     intMask(i, j) = 1;
                     Wu.push(vec2i(i, j));
                 }
             }
         }
-        int counter = 0;
         while (Wu.size() > 0) {
-            counter++;
             vec2i pos = Wu.front();
             Wu.pop();
             int x = pos.x, y = pos.y;
@@ -427,7 +421,7 @@ struct alignas(32) Array2D<double, NX, NY> {
                     count++;
                 }
             }
-            (*this)(x, y) = sum / count;
+            (*this)(x, y) = count == 0? 0 : sum / count;
             for (auto neighbor : {vec2i(x-1,y), vec2i(x+1,y), vec2i(x,y-1), vec2i(x,y+1)}) {
                 if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
                 if (intMask(neighbor.x, neighbor.y) == UINT32_MAX) {

@@ -58,7 +58,7 @@ struct WaterSim2D {
     };
 
     StageType stage = StageType::Init;
-    SimMode mode = SimMode::SemiLagrangian;
+    SimMode mode = SimMode::PIC;
 
     PerformanceCounter perfCounter;
 
