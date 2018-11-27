@@ -322,55 +322,61 @@ void WaterSim2D::applyProjection() {
 
     // calculate lhs (matrix A)
     double scaleA = dt / (rho * dx * dx);
-    iterateParallel([&](size_t i, size_t j) {
-        if (cell(i,j) == CellType::FLUID) {
-            if (cell(i-1,j) == CellType::FLUID) {
-                Adiag(i,j) += scaleA;
-            }
-            if (cell(i+1,j) == CellType::FLUID) {
-                Adiag(i,j) += scaleA;
-                Ax(i,j) = -scaleA;
-            }
-            else if (cell(i+1,j) == CellType::EMPTY) {
-                Adiag(i,j) += scaleA;
-            }
-            if (cell(i,j-1) == CellType::FLUID) {
-                Adiag(i,j) += scaleA;
-            }
-            if (cell(i,j+1) == CellType::FLUID) {
-                Adiag(i,j) += scaleA;
-                Ay(i,j) = -scaleA;
-            }
-            else if (cell(i,j+1) == CellType::EMPTY) {
-                Adiag(i,j) += scaleA;
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if (cell(i,j) == CellType::FLUID) {
+                if (cell(i-1,j) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                }
+                if (cell(i+1,j) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                    Ax(i,j) = -scaleA;
+                }
+                else if (cell(i+1,j) == CellType::EMPTY) {
+                    Adiag(i,j) += scaleA;
+                }
+                if (cell(i,j-1) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                }
+                if (cell(i,j+1) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                    Ay(i,j) = -scaleA;
+                }
+                else if (cell(i,j+1) == CellType::EMPTY) {
+                    Adiag(i,j) += scaleA;
+                }
             }
         }
-    });
+    }
 
     auto& rhs = gridStack.newItem();
 
     // calculate rhs
     {
         double scale = 1.0 / dx;
-        iterate([&](size_t i, size_t j) {
-            if (cell(i,j) == CellType::FLUID) {
-                rhs(i,j) = -scale * (mac.u(i+1,j)-mac.u(i,j)+mac.v(i,j+1)-mac.v(i,j));
-                // modify rhs to account for solid velocities
-                // TODO: use usolid, vsolid, wsolid instead of 0
-                if (cell(i-1,j) == CellType::SOLID) {
-                    rhs(i,j) -= scale * (mac.u(i,j) - 0);
-                }
-                if (cell(i+1,j) == CellType::SOLID) {
-                    rhs(i,j) += scale * (mac.u(i+1,j) - 0);
-                }
-                if (cell(i,j-1) == CellType::SOLID) {
-                    rhs(i,j) -= scale * (mac.v(i,j) - 0);
-                }
-                if (cell(i,j+1) == CellType::SOLID) {
-                    rhs(i,j) += scale * (mac.v(i,j+1) - 0);
+#pragma omp parallel for
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                if (cell(i,j) == CellType::FLUID) {
+                    rhs(i,j) = -scale * (mac.u(i+1,j)-mac.u(i,j)+mac.v(i,j+1)-mac.v(i,j));
+                    // modify rhs to account for solid velocities
+                    // TODO: use usolid, vsolid, wsolid instead of 0
+                    if (cell(i-1,j) == CellType::SOLID) {
+                        rhs(i,j) -= scale * (mac.u(i,j) - 0);
+                    }
+                    if (cell(i+1,j) == CellType::SOLID) {
+                        rhs(i,j) += scale * (mac.u(i+1,j) - 0);
+                    }
+                    if (cell(i,j-1) == CellType::SOLID) {
+                        rhs(i,j) -= scale * (mac.v(i,j) - 0);
+                    }
+                    if (cell(i,j+1) == CellType::SOLID) {
+                        rhs(i,j) += scale * (mac.v(i,j+1) - 0);
+                    }
                 }
             }
-        });
+        }
     }
 
 #define SQUARE(x) (x)*(x)
@@ -380,6 +386,7 @@ void WaterSim2D::applyProjection() {
         constexpr double tau = 0.97;
         constexpr double sigma = 0.25;
         double e;
+#pragma omp parallel for
         for (size_t j = 1; j < SIZEY; j++) {
             for (size_t i = 1; i < SIZEX; i++) {
                 if (cell(i, j) == CellType::FLUID) {
@@ -437,15 +444,18 @@ void WaterSim2D::applyProjection() {
     int iter = 0;
     while (iter < maxIters) {
         // apply A
-        iterate([&](size_t i, size_t j) {
-            if (cell(i,j) == CellType::FLUID) {
-                z(i, j) = Adiag(i, j) * s(i, j)
-                          + Ax(i - 1, j) * s(i - 1, j)
-                          + Ax(i, j) * s(i + 1, j)
-                          + Ay(i, j - 1) * s(i, j - 1)
-                          + Ay(i, j) * s(i, j + 1);
+#pragma omp parallel for
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                if (cell(i, j) == CellType::FLUID) {
+                    z(i, j) = Adiag(i, j) * s(i, j)
+                              + Ax(i - 1, j) * s(i - 1, j)
+                              + Ax(i, j) * s(i + 1, j)
+                              + Ay(i, j - 1) * s(i, j - 1)
+                              + Ay(i, j) * s(i, j + 1);
+                }
             }
-        });
+        }
 
         // Note: this code is needed to handle when rhs = 0 (No boundary conditions) -> p = 0 everywhere
         double rhsNorm = rhs.infiniteNorm();
@@ -481,6 +491,7 @@ void WaterSim2D::updateVelocity() {
 
     {
         double scale = dt / (rho * dx);
+#pragma omp parallel for
         for (size_t j = 0; j < SIZEY; j++) {
             for (size_t i = 0; i < SIZEX; i++) {
                 if ((i > 0 && cell(i-1,j) == CellType::FLUID) || cell(i,j) == CellType::FLUID) {
@@ -542,6 +553,7 @@ void WaterSim2D::updateVelocity() {
 }
 
 void WaterSim2D::updateParticleVelocities() {
+#pragma omp parallel for
     for (int e = 0; e < particles.size; e++) {
         vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
         double velX = mac.u.extract(upos);
@@ -560,11 +572,15 @@ void WaterSim2D::applyAdvection() {
     Grid2D<CellType>* oldCell = new Grid2D<CellType>();
     defer {delete oldCell;};
     oldCell->copyFrom(cell);
-    iterate([&](size_t i, size_t j) {
-        if(cell(i,j) == CellType::FLUID) {
-            cell(i,j) = CellType::EMPTY;
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if(cell(i,j) == CellType::FLUID) {
+                cell(i,j) = CellType::EMPTY;
+            }
         }
-    });
+    }
+#pragma omp parallel for
     for (int i = 0; i < particles.size; i++) {
         auto& pos = particles[i];
         auto k1 = mac.velInterp(pos);
@@ -577,6 +593,7 @@ void WaterSim2D::applyAdvection() {
         }
     }
 
+#pragma omp parallel for
     // Correction to eliminate "bubbles" inside fluids
     for (size_t i = 1; i < SIZEX - 1; i++) {
         for (size_t j = 1; j < SIZEY - 1; j++) {
@@ -631,12 +648,20 @@ void WaterSim2D::createLevelSet() {
     auto* t = new Grid2D<size_t>();
     defer {delete t;};
 
-    iterateParallel([&](size_t i, size_t j) {
-        phi(i,j) = HUGE_VAL;
-    });
-    iterateParallel([&](size_t i, size_t j) {
-        (*t)(i,j) = (size_t)-1;
-    });
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            phi(i,j) = HUGE_VAL;
+        }
+    }
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            (*t)(i, j) = (size_t) -1;
+        }
+    }
+
+#pragma omp parallel for
     for (size_t e = 0; e < particles.size; e++) {
         auto pos = particles[e];
         int x = (int)(pos.x / dx), y = (int)(pos.y / dx);
@@ -646,6 +671,7 @@ void WaterSim2D::createLevelSet() {
             (*t)(x,y) = e;
         }
     }
+
     fastSweepIterate([&](size_t i, size_t j) {
         const size_t i_list[] = {i-1, i+1, i, i};
         const size_t j_list[] = {j, j, j-1, j+1};
@@ -770,6 +796,7 @@ void WaterSim2D::updateLevelSet() {
     }
 
     oldPhi->copyFrom(phi);
+#pragma omp parallel for
     for (size_t j = 1; j < SIZEY-1; j++) {
         for (size_t i = 1; i < SIZEX-1; i++) {
             size_t im = i == 0? 0 : i-1;

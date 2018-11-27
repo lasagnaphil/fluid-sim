@@ -85,7 +85,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     cellFieldShader = Shader::fromStr(cellFieldVS, cellFS);
 
     memcpy(quadVertices, origQuadVertices, sizeof(origQuadVertices));
-    for (int i = 0; i < 6*36; i++) {
+    for (int i = 0; i < 6; i++) {
         quadVertices[i].x *= sim->dx;
         quadVertices[i].y *= sim->dx;
     }

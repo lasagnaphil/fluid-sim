@@ -8,9 +8,9 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type -fopenmp=libomp")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native")
 
 file(GLOB_RECURSE PROJECT_SOURCES src/*.cpp)
@@ -18,6 +18,11 @@ file(GLOB_RECURSE PROJECT_HEADERS src/*.h)
 file(GLOB_RECURSE PROJECT_SHADERS src/shaders/*.vert src/shaders/*.frag src/shaders/*.geom)
 
 add_executable(${PROJECT_NAME} ${PROJECT_HEADERS} ${PROJECT_SOURCES} ${PROJECT_SHADERS})
+
+option(USE_AVX "Use AVX SIMD Instructions." ON)
+if (USE_AVX)
+    add_compile_definitions(USE_AVX_SIMD)
+endif()
 
 # PThreads
 set(THREADS_PREFER_PTHREAD_FLAG ON)
