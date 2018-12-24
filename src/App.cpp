@@ -135,23 +135,18 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
     // load systems
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
-        waterRenderer2D = new WaterRenderer2D();
+        waterSim2D->setup(WaterSimSettings::Dim2D::DT, WaterSimSettings::Dim2D::DX, 997.0, -9.81);
         camera2d = Camera2D::create(&settings, vec2f(waterSim2D->getGridCenter()));
-        camera2d.zoom = 64.0f;
-    }
-    else if (mode == Mode::Dim3) {
-        waterSim3D = new WaterSim3D();
-        waterRenderer3D = new WaterRenderer3D();
-        fpsCamera = FirstPersonCamera::create(&settings);
-        fpsCamera.transform.pos = vec3f(0.5f, 0.5f, 3.0f);
-    }
-
-    if (mode == Mode::Dim2) {
-        waterSim2D->setup(0.005, 0.001, 997.0, -9.81);
+        camera2d.zoom = 64.0f * (0.001 / waterSim2D->dx);
+        waterRenderer2D = new WaterRenderer2D();
         waterRenderer2D->setup(waterSim2D, &camera2d);
     }
     else if (mode == Mode::Dim3) {
+        waterSim3D = new WaterSim3D();
         waterSim3D->setup();
+        fpsCamera = FirstPersonCamera::create(&settings);
+        fpsCamera.transform.pos = vec3f(0.5f, 0.5f, 3.0f);
+        waterRenderer3D = new WaterRenderer3D();
         waterRenderer3D->setup(waterSim3D, &fpsCamera);
     }
 }

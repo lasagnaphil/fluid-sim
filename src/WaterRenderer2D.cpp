@@ -341,6 +341,7 @@ void WaterRenderer2D::drawUI() {
         ImGui::Text("Max velocity in fluid: %f", maxVelocity);
         double CFLnum = sim->dt * maxVelocity / sim->dx;
         ImGui::Text("CFL Number: %f", CFLnum);
+        ImGui::Text("Current timestep: %f", sim->dt);
     }
     if (ImGui::CollapsingHeader("Options")) {
         ImGui::Checkbox("Render cells", &renderCells);

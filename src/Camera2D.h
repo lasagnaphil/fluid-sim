@@ -12,7 +12,6 @@ struct AppSettings;
 struct Shader;
 
 struct Camera2D {
-    static Camera2D create(AppSettings* settings);
     static Camera2D create(AppSettings* settings, mathfu::vec2f pos);
 
     void addShader(Shader* shader);

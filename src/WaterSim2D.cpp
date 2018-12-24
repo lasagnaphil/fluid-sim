@@ -227,12 +227,13 @@ void WaterSim2D::transferVelocityToGrid() {
     auto udiv = new Array2D<double, SIZEX+1, SIZEY>();
     auto vdiv = new Array2D<double, SIZEX, SIZEY+1>();
     for (int e = 0; e < particles.size; e++) {
-        auto& xp = particles[e];
+        auto xp = particles[e];
+        auto vp = particleVels[e];
         auto upos = vec2d(xp.x / dx, xp.y / dx - 0.5);
-        mac.u.distribute(upos, particleVels[e].x);
+        mac.u.distribute(upos, vp.x);
         udiv->distribute(upos, 1.0);
         auto vpos = vec2d(xp.x / dx - 0.5, xp.y / dx);
-        mac.v.distribute(vpos, particleVels[e].y);
+        mac.v.distribute(vpos, vp.y);
         vdiv->distribute(vpos, 1.0);
     }
     mac.u.safeDivBy(*udiv);
@@ -544,15 +545,28 @@ void WaterSim2D::updateParticleVelocities() {
         vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
         double velY = mac.v.extract(vpos);
         particleVels[e] = vec2d(velX, velY);
-        double velSize = particleVels[e].Length();
-        if (velSize >= 5 * dx / dt) {
-            log_warn("Particle velocity violates CFL condition! (vel=%f, pos=(%f, %f))", velSize, particles[e].x, particles[e].y);
-        }
     }
 }
 
 
 void WaterSim2D::applyAdvection() {
+    // Change timestep to apply CFL condition
+    double cmax = 0.0;
+    int emax = -1;
+    for (int e = 0; e < particles.size; e++) {
+        vec2d vel = particleVels[e];
+        double c = (vel.x + vel.y) * dt / dx;
+        if (c > cmax) {
+            cmax = c;
+            emax = e;
+        }
+    }
+    if (cmax > 5.0) {
+        log_warn("Particle velocity violates CFL condition! (C=%f, vel=%f, pos=(%f, %f))",
+                cmax, particles[emax].Length(), particles[emax].x, particles[emax].y);
+        dt *= 5.0 / cmax;
+    }
+
     Grid2D<CellType>* oldCell = new Grid2D<CellType>();
     defer {delete oldCell;};
     oldCell->copyFrom(cell);
