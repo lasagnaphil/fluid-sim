@@ -36,7 +36,8 @@ struct WaterSim2D {
     Array2D<double, SIZEX, SIZEY> phi = {};
     Vec<mathfu::vec2d> particleVels = {};
 
-    double gravity = -9.81;
+    mathfu::vec2d gravity = {0, -9.81};
+    mathfu::vec2d origGravity = {0, -9.81};
     double rho = 997.0;
 
     bool rendered = false;
@@ -53,12 +54,10 @@ struct WaterSim2D {
     };
     int numStages;
 
-    enum class SimMode {
-        SemiLagrangian, PIC
-    };
-
     StageType stage = StageType::Init;
-    SimMode mode = SimMode::PIC;
+
+    using SimMode = WaterSimSettings::SimMode;
+    SimMode mode = WaterSimSettings::Dim2D::SIM_MODE;
 
     PerformanceCounter perfCounter;
 
@@ -84,8 +83,6 @@ struct WaterSim2D {
 
     void applyAdvection();
 
-    mathfu::vec2d clampPos(mathfu::vec2d pos);
-
     double avgPressure();
     double avgPressureInFluid();
     double maxVelocity();
@@ -94,6 +91,8 @@ struct WaterSim2D {
 
     void createLevelSet();
     void updateLevelSet();
+
+    mathfu::vec2d clampPos(mathfu::vec2d from, mathfu::vec2d to);
 
     template <typename Fun>
     void iterateU(Fun f) const {

@@ -298,7 +298,44 @@ struct alignas(32) Array2D<double, NX, NY> {
 #undef SQR
     }
 
-    void distribute(mathfu::vec2d pos, double value) {
+    void linearDistribute(mathfu::vec2d pos, double value) {
+        int ui = (int) pos.x;
+        int uj = (int) pos.y;
+
+        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+
+        double x1 = utils::clamp<int>(ui, 0, NX - 1);
+        double x2 = utils::clamp<int>(ui + 1, 0, NX - 1);
+        double y1 = utils::clamp<int>(uj, 0, NY - 1);
+        double y2 = utils::clamp<int>(uj + 1, 0, NY - 1);
+
+        (*this)(x1, y1) += (1 - disp.x) * (1 - disp.y) * value;
+        (*this)(x2, y1) += disp.x * (1 - disp.y) * value;
+        (*this)(x1, y2) += (1 - disp.x) * disp.y * value;
+        (*this)(x2, y2) += disp.x * disp.y * value;
+    }
+
+    double linearExtract(mathfu::vec2d pos) {
+        int ui = (int) pos.x;
+        int uj = (int) pos.y;
+        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+
+        double value = 0.0f;
+
+        double x1 = utils::clamp<int>(ui, 0, NX - 1);
+        double x2 = utils::clamp<int>(ui + 1, 0, NX - 1);
+        double y1 = utils::clamp<int>(uj, 0, NY - 1);
+        double y2 = utils::clamp<int>(uj + 1, 0, NY - 1);
+
+        value += (*this)(x1, y1) * (1 - disp.x) * (1 - disp.y);
+        value += (*this)(x2, y1) * disp.x * (1 - disp.y);
+        value += (*this)(x1, y2) * (1 - disp.x) * disp.y;
+        value += (*this)(x2, y2) * disp.x * disp.y;
+
+        return value;
+    }
+
+    void catmullRomDistribute(mathfu::vec2d pos, double value) {
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
         auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
@@ -308,77 +345,61 @@ struct alignas(32) Array2D<double, NX, NY> {
         double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
         double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
+        double x1 = utils::clamp<int>(ui - 1, 0, NX - 1);
+        double x2 = utils::clamp<int>(ui    , 0, NX - 1);
+        double x3 = utils::clamp<int>(ui + 1, 0, NX - 1);
+        double x4 = utils::clamp<int>(ui + 2, 0, NX - 1);
+        double y1 = utils::clamp<int>(uj - 1, 0, NY - 1);
+        double y2 = utils::clamp<int>(uj    , 0, NY - 1);
+        double y3 = utils::clamp<int>(uj + 1, 0, NY - 1);
+        double y4 = utils::clamp<int>(uj + 2, 0, NY - 1);
         if (disp.x < 0.5 && disp.y < 0.5) {
-            bool mask_x1 = ui - 1 >= 0 && ui - 1 < NX;
-            bool mask_x2 = ui     >= 0 && ui     < NX;
-            bool mask_x3 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_y1 = uj - 1 >= 0 && uj - 1 < NY;
-            bool mask_y2 = uj     >= 0 && uj     < NY;
-            bool mask_y3 = uj + 1 >= 0 && uj + 1 < NY;
-            if (mask_x1 && mask_y1) (*this)(ui - 1, uj - 1) += kx1 * ky1 * value;
-            if (mask_x1 && mask_y2) (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
-            if (mask_x1 && mask_y3) (*this)(ui - 1, uj + 1) += kx1 * ky3 * value;
-            if (mask_x2 && mask_y1) (*this)(ui    , uj - 1) += kx2 * ky1 * value;
-            if (mask_x2 && mask_y2) (*this)(ui    , uj    ) += kx2 * ky2 * value;
-            if (mask_x2 && mask_y3) (*this)(ui    , uj + 1) += kx2 * ky3 * value;
-            if (mask_x3 && mask_y1) (*this)(ui + 1, uj - 1) += kx3 * ky1 * value;
-            if (mask_x3 && mask_y2) (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
-            if (mask_x3 && mask_y3) (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
+            (*this)(x1, y1) += kx1 * ky1 * value;
+            (*this)(x1, y2) += kx1 * ky2 * value;
+            (*this)(x1, y3) += kx1 * ky3 * value;
+            (*this)(x2, y1) += kx2 * ky1 * value;
+            (*this)(x2, y2) += kx2 * ky2 * value;
+            (*this)(x2, y3) += kx2 * ky3 * value;
+            (*this)(x3, y1) += kx3 * ky1 * value;
+            (*this)(x3, y2) += kx3 * ky2 * value;
+            (*this)(x3, y3) += kx3 * ky3 * value;
         }
         else if (disp.x >= 0.5 && disp.y < 0.5) {
-            bool mask_x1 = ui     >= 0 && ui     < NX;
-            bool mask_x2 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_x3 = ui + 2 >= 0 && ui + 2 < NX;
-            bool mask_y1 = uj - 1 >= 0 && uj - 1 < NY;
-            bool mask_y2 = uj     >= 0 && uj     < NY;
-            bool mask_y3 = uj + 1 >= 0 && uj + 1 < NY;
-            if (mask_x1 && mask_y1) (*this)(ui    , uj - 1) += kx2 * ky1 * value;
-            if (mask_x1 && mask_y2) (*this)(ui    , uj    ) += kx2 * ky2 * value;
-            if (mask_x1 && mask_y3) (*this)(ui    , uj + 1) += kx2 * ky3 * value;
-            if (mask_x2 && mask_y1) (*this)(ui + 1, uj - 1) += kx3 * ky1 * value;
-            if (mask_x2 && mask_y2) (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
-            if (mask_x2 && mask_y3) (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
-            if (mask_x3 && mask_y1) (*this)(ui + 2, uj - 1) += kx1 * ky1 * value;
-            if (mask_x3 && mask_y2) (*this)(ui + 2, uj    ) += kx1 * ky2 * value;
-            if (mask_x3 && mask_y3) (*this)(ui + 2, uj + 1) += kx1 * ky3 * value;
+            (*this)(x2, y1) += kx2 * ky1 * value;
+            (*this)(x2, y2) += kx2 * ky2 * value;
+            (*this)(x2, y3) += kx2 * ky3 * value;
+            (*this)(x3, y1) += kx3 * ky1 * value;
+            (*this)(x3, y2) += kx3 * ky2 * value;
+            (*this)(x3, y3) += kx3 * ky3 * value;
+            (*this)(x4, y1) += kx1 * ky1 * value;
+            (*this)(x4, y2) += kx1 * ky2 * value;
+            (*this)(x4, y3) += kx1 * ky3 * value;
         }
         else if (disp.x < 0.5 && disp.y >= 0.5) {
-            bool mask_x1 = ui - 1 >= 0 && ui - 1 < NX;
-            bool mask_x2 = ui     >= 0 && ui     < NX;
-            bool mask_x3 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_y1 = uj     >= 0 && uj     < NY;
-            bool mask_y2 = uj + 1 >= 0 && uj + 1 < NY;
-            bool mask_y3 = uj + 2 >= 0 && uj + 2 < NY;
-            if (mask_x1 && mask_y1) (*this)(ui - 1, uj    ) += kx1 * ky2 * value;
-            if (mask_x1 && mask_y2) (*this)(ui - 1, uj + 1) += kx1 * ky3 * value;
-            if (mask_x1 && mask_y3) (*this)(ui - 1, uj + 2) += kx1 * ky1 * value;
-            if (mask_x2 && mask_y1) (*this)(ui    , uj    ) += kx2 * ky2 * value;
-            if (mask_x2 && mask_y2) (*this)(ui    , uj + 1) += kx2 * ky3 * value;
-            if (mask_x2 && mask_y3) (*this)(ui    , uj + 2) += kx2 * ky1 * value;
-            if (mask_x3 && mask_y1) (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
-            if (mask_x3 && mask_y2) (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
-            if (mask_x3 && mask_y3) (*this)(ui + 1, uj + 2) += kx3 * ky1 * value;
+            (*this)(x1, y2) += kx1 * ky2 * value;
+            (*this)(x1, y3) += kx1 * ky3 * value;
+            (*this)(x1, y4) += kx1 * ky1 * value;
+            (*this)(x2, y2) += kx2 * ky2 * value;
+            (*this)(x2, y3) += kx2 * ky3 * value;
+            (*this)(x2, y4) += kx2 * ky1 * value;
+            (*this)(x3, y2) += kx3 * ky2 * value;
+            (*this)(x3, y3) += kx3 * ky3 * value;
+            (*this)(x3, y4) += kx3 * ky1 * value;
         }
         else if (disp.x >= 0.5 && disp.y >= 0.5) {
-            bool mask_x1 = ui     >= 0 && ui     < NX;
-            bool mask_x2 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_x3 = ui + 2 >= 0 && ui + 2 < NX;
-            bool mask_y1 = uj     >= 0 && uj     < NY;
-            bool mask_y2 = uj + 1 >= 0 && uj + 1 < NY;
-            bool mask_y3 = uj + 2 >= 0 && uj + 2 < NY;
-            if (mask_x1 && mask_y1) (*this)(ui    , uj    ) += kx2 * ky2 * value;
-            if (mask_x1 && mask_y2) (*this)(ui    , uj + 1) += kx2 * ky3 * value;
-            if (mask_x1 && mask_y3) (*this)(ui    , uj + 2) += kx2 * ky1 * value;
-            if (mask_x2 && mask_y1) (*this)(ui + 1, uj    ) += kx3 * ky2 * value;
-            if (mask_x2 && mask_y2) (*this)(ui + 1, uj + 1) += kx3 * ky3 * value;
-            if (mask_x2 && mask_y3) (*this)(ui + 1, uj + 2) += kx3 * ky1 * value;
-            if (mask_x3 && mask_y1) (*this)(ui + 2, uj    ) += kx1 * ky2 * value;
-            if (mask_x3 && mask_y2) (*this)(ui + 2, uj + 1) += kx1 * ky3 * value;
-            if (mask_x3 && mask_y3) (*this)(ui + 2, uj + 2) += kx1 * ky1 * value;
+            (*this)(x2, y2) += kx2 * ky2 * value;
+            (*this)(x2, y2) += kx2 * ky3 * value;
+            (*this)(x2, y2) += kx2 * ky1 * value;
+            (*this)(x3, y3) += kx3 * ky2 * value;
+            (*this)(x3, y3) += kx3 * ky3 * value;
+            (*this)(x3, y3) += kx3 * ky1 * value;
+            (*this)(x4, y4) += kx1 * ky2 * value;
+            (*this)(x4, y4) += kx1 * ky3 * value;
+            (*this)(x4, y4) += kx1 * ky1 * value;
         }
     }
 
-    double extract(mathfu::vec2d pos) {
+    double catmullRomExtract(mathfu::vec2d pos) {
         double value = 0.0;
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
@@ -389,73 +410,57 @@ struct alignas(32) Array2D<double, NX, NY> {
         double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
         double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
+        double x1 = utils::clamp<int>(ui - 1, 0, NX - 1);
+        double x2 = utils::clamp<int>(ui    , 0, NX - 1);
+        double x3 = utils::clamp<int>(ui + 1, 0, NX - 1);
+        double x4 = utils::clamp<int>(ui + 2, 0, NX - 1);
+        double y1 = utils::clamp<int>(uj - 1, 0, NY - 1);
+        double y2 = utils::clamp<int>(uj    , 0, NY - 1);
+        double y3 = utils::clamp<int>(uj + 1, 0, NY - 1);
+        double y4 = utils::clamp<int>(uj + 2, 0, NY - 1);
         if (disp.x < 0.5 && disp.y < 0.5) {
-            bool mask_x1 = ui - 1 >= 0 && ui - 1 < NX;
-            bool mask_x2 = ui     >= 0 && ui     < NX;
-            bool mask_x3 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_y1 = uj - 1 >= 0 && uj - 1 < NY;
-            bool mask_y2 = uj     >= 0 && uj     < NY;
-            bool mask_y3 = uj + 1 >= 0 && uj + 1 < NY;
-            if (mask_x1 && mask_y1) value += kx1 * ky1 * (*this)(ui - 1, uj - 1);
-            if (mask_x1 && mask_y2) value += kx1 * ky2 * (*this)(ui - 1, uj    );
-            if (mask_x1 && mask_y3) value += kx1 * ky3 * (*this)(ui - 1, uj + 1);
-            if (mask_x2 && mask_y1) value += kx2 * ky1 * (*this)(ui    , uj - 1);
-            if (mask_x2 && mask_y2) value += kx2 * ky2 * (*this)(ui    , uj    );
-            if (mask_x2 && mask_y3) value += kx2 * ky3 * (*this)(ui    , uj + 1);
-            if (mask_x3 && mask_y1) value += kx3 * ky1 * (*this)(ui + 1, uj - 1);
-            if (mask_x3 && mask_y2) value += kx3 * ky2 * (*this)(ui + 1, uj    );
-            if (mask_x3 && mask_y3) value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
+            value += kx1 * ky1 * (*this)(x1, y1);
+            value += kx1 * ky2 * (*this)(x1, y2);
+            value += kx1 * ky3 * (*this)(x1, y3);
+            value += kx2 * ky1 * (*this)(x2, y1);
+            value += kx2 * ky2 * (*this)(x2, y2);
+            value += kx2 * ky3 * (*this)(x2, y3);
+            value += kx3 * ky1 * (*this)(x3, y1);
+            value += kx3 * ky2 * (*this)(x3, y2);
+            value += kx3 * ky3 * (*this)(x3, y3);
         }
         else if (disp.x >= 0.5 && disp.y < 0.5) {
-            bool mask_x1 = ui     >= 0 && ui     < NX;
-            bool mask_x2 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_x3 = ui + 2 >= 0 && ui + 2 < NX;
-            bool mask_y1 = uj - 1 >= 0 && uj - 1 < NY;
-            bool mask_y2 = uj     >= 0 && uj     < NY;
-            bool mask_y3 = uj + 1 >= 0 && uj + 1 < NY;
-            if (mask_x1 && mask_y1) value += kx2 * ky1 * (*this)(ui    , uj - 1);
-            if (mask_x1 && mask_y2) value += kx2 * ky2 * (*this)(ui    , uj    );
-            if (mask_x1 && mask_y3) value += kx2 * ky3 * (*this)(ui    , uj + 1);
-            if (mask_x2 && mask_y1) value += kx3 * ky1 * (*this)(ui + 1, uj - 1);
-            if (mask_x2 && mask_y2) value += kx3 * ky2 * (*this)(ui + 1, uj    );
-            if (mask_x2 && mask_y3) value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
-            if (mask_x3 && mask_y1) value += kx1 * ky1 * (*this)(ui + 2, uj - 1);
-            if (mask_x3 && mask_y2) value += kx1 * ky2 * (*this)(ui + 2, uj    );
-            if (mask_x3 && mask_y3) value += kx1 * ky3 * (*this)(ui + 2, uj + 1);
+            value += kx2 * ky1 * (*this)(x2, y1);
+            value += kx2 * ky2 * (*this)(x2, y2);
+            value += kx2 * ky3 * (*this)(x2, y3);
+            value += kx3 * ky1 * (*this)(x3, y1);
+            value += kx3 * ky2 * (*this)(x3, y2);
+            value += kx3 * ky3 * (*this)(x3, y3);
+            value += kx1 * ky1 * (*this)(x4, y1);
+            value += kx1 * ky2 * (*this)(x4, y2);
+            value += kx1 * ky3 * (*this)(x4, y3);
         }
         else if (disp.x < 0.5 && disp.y >= 0.5) {
-            bool mask_x1 = ui - 1 >= 0 && ui - 1 < NX;
-            bool mask_x2 = ui     >= 0 && ui     < NX;
-            bool mask_x3 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_y1 = uj     >= 0 && uj     < NY;
-            bool mask_y2 = uj + 1 >= 0 && uj + 1 < NY;
-            bool mask_y3 = uj + 2 >= 0 && uj + 2 < NY;
-            if (mask_x1 && mask_y1) value += kx1 * ky2 * (*this)(ui - 1, uj    );
-            if (mask_x1 && mask_y2) value += kx1 * ky3 * (*this)(ui - 1, uj + 1);
-            if (mask_x1 && mask_y3) value += kx1 * ky1 * (*this)(ui - 1, uj + 2);
-            if (mask_x2 && mask_y1) value += kx2 * ky2 * (*this)(ui    , uj    );
-            if (mask_x2 && mask_y2) value += kx2 * ky3 * (*this)(ui    , uj + 1);
-            if (mask_x2 && mask_y3) value += kx2 * ky1 * (*this)(ui    , uj + 2);
-            if (mask_x3 && mask_y1) value += kx3 * ky2 * (*this)(ui + 1, uj    );
-            if (mask_x3 && mask_y2) value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
-            if (mask_x3 && mask_y3) value += kx3 * ky1 * (*this)(ui + 1, uj + 2);
+            value += kx1 * ky2 * (*this)(x1, y2);
+            value += kx1 * ky3 * (*this)(x1, y3);
+            value += kx1 * ky1 * (*this)(x1, y4);
+            value += kx2 * ky2 * (*this)(x2, y2);
+            value += kx2 * ky3 * (*this)(x2, y3);
+            value += kx2 * ky1 * (*this)(x2, y4);
+            value += kx3 * ky2 * (*this)(x3, y2);
+            value += kx3 * ky3 * (*this)(x3, y3);
+            value += kx3 * ky1 * (*this)(x3, y4);
         }
         else if (disp.x >= 0.5 && disp.y >= 0.5) {
-            bool mask_x1 = ui     >= 0 && ui     < NX;
-            bool mask_x2 = ui + 1 >= 0 && ui + 1 < NX;
-            bool mask_x3 = ui + 2 >= 0 && ui + 2 < NX;
-            bool mask_y1 = uj     >= 0 && uj     < NY;
-            bool mask_y2 = uj + 1 >= 0 && uj + 1 < NY;
-            bool mask_y3 = uj + 2 >= 0 && uj + 2 < NY;
-            if (mask_x1 && mask_y1) value += kx2 * ky2 * (*this)(ui    , uj    );
-            if (mask_x1 && mask_y2) value += kx2 * ky3 * (*this)(ui    , uj + 1);
-            if (mask_x1 && mask_y3) value += kx2 * ky1 * (*this)(ui    , uj + 2);
-            if (mask_x2 && mask_y1) value += kx3 * ky2 * (*this)(ui + 1, uj    );
-            if (mask_x2 && mask_y2) value += kx3 * ky3 * (*this)(ui + 1, uj + 1);
-            if (mask_x2 && mask_y3) value += kx3 * ky1 * (*this)(ui + 1, uj + 2);
-            if (mask_x3 && mask_y1) value += kx1 * ky2 * (*this)(ui + 2, uj    );
-            if (mask_x3 && mask_y2) value += kx1 * ky3 * (*this)(ui + 2, uj + 1);
-            if (mask_x3 && mask_y3) value += kx1 * ky1 * (*this)(ui + 2, uj + 2);
+            value += kx2 * ky2 * (*this)(x2, y2);
+            value += kx2 * ky3 * (*this)(x2, y3);
+            value += kx2 * ky1 * (*this)(x2, y4);
+            value += kx3 * ky2 * (*this)(x3, y2);
+            value += kx3 * ky3 * (*this)(x3, y3);
+            value += kx3 * ky1 * (*this)(x3, y4);
+            value += kx1 * ky2 * (*this)(x4, y2);
+            value += kx1 * ky3 * (*this)(x4, y3);
+            value += kx1 * ky1 * (*this)(x4, y4);
         }
         return value;
     }

@@ -253,19 +253,20 @@ void WaterRenderer2D::update() {
     }
 
     // Change velocity using mouse drag
-    static vec2f startMousePos;
-    vec2f currMousePos;
+    /*
+    static vec2f startLeftMousePos;
+    vec2f currLeftMousePos;
     constexpr float VEL_MOUSEDRAG_SCALE = 0.1f;
     auto inputMgr = InputManager::get();
     if (inputMgr->isMouseEntered(SDL_BUTTON_LEFT)) {
-        startMousePos = vec2f(inputMgr->getMousePos());
+        startLeftMousePos = vec2f(inputMgr->getMousePos());
     }
     else if (inputMgr->isMousePressed(SDL_BUTTON_LEFT)) {
-        currMousePos = vec2f(inputMgr->getMousePos());
-        vec2f velIncrease = VEL_MOUSEDRAG_SCALE * (currMousePos - startMousePos);
+        currLeftMousePos = vec2f(inputMgr->getMousePos());
+        vec2f velIncrease = VEL_MOUSEDRAG_SCALE * (currLeftMousePos - startLeftMousePos);
 
         vec2f screenSize = vec2f(camera->settings->screenSize);
-        vec2f normMousePos = startMousePos - (screenSize / 2.f);
+        vec2f normMousePos = startLeftMousePos - (screenSize / 2.f);
         normMousePos.y *= -1;
         vec2f gridPos = (normMousePos / camera->pixelsPerMeter / camera->zoom + camera->pos) / (float)sim->dx;
 
@@ -278,6 +279,23 @@ void WaterRenderer2D::update() {
             size_t vy = utils::clamp<size_t>(gridPos.y, 1, SIZEY - 2);
             sim->mac.v(vx, vy) += velIncrease.y;
         }
+    }
+     */
+    // Change gravity using mouse drag
+    static vec2f startRightMousePos;
+    vec2f currRightMousePos;
+    constexpr float GRAVITY_MOUSEDRAG_SCALE = 0.002f;
+    auto inputMgr = InputManager::get();
+    if (inputMgr->isMouseEntered(SDL_BUTTON_RIGHT)) {
+        startRightMousePos = vec2f(inputMgr->getMousePos());
+    }
+    else if (inputMgr->isMousePressed(SDL_BUTTON_RIGHT)) {
+        currRightMousePos = vec2f(inputMgr->getMousePos());
+        auto gravity = GRAVITY_MOUSEDRAG_SCALE * (currRightMousePos - startRightMousePos);
+        sim->gravity = vec2d(sim->origGravity.x + gravity.x, sim->origGravity.y + gravity.y);
+    }
+    else {
+        sim->gravity = sim->origGravity;
     }
 }
 
@@ -332,6 +350,15 @@ void WaterRenderer2D::draw() {
 
 void WaterRenderer2D::drawUI() {
     ImGui::Begin("Water Simulation");
+    if (ImGui::CollapsingHeader("Parameters")) {
+        float gravity[2];
+        gravity[0] = (float)sim->gravity.x;
+        gravity[1] = (float)sim->gravity.y;
+        ImGui::SliderFloat2("Gravity", gravity, -15.0f, 15.0f);
+        sim->gravity.x = gravity[0];
+        sim->gravity.y = gravity[1];
+
+    }
     if (ImGui::CollapsingHeader("Data")) {
         ImGui::Text("Current frame: %f", sim->currentTime);
         ImGui::Text("Current stage: %s", sim->printStage());

@@ -62,17 +62,17 @@ struct MACGrid2D {
     double velInterpU(mathfu::vec2d pos) {
         pos /= dx;
         pos.y -= 0.5;
-        pos.x = utils::clamp<double>(pos.x, 0, NX);
-        pos.y = utils::clamp<double>(pos.y, 0, NY);
-        return u.triCubic(pos);
+        pos.x = utils::clamp<double>(pos.x, 1e-6, NX - 1 - 1e-6);
+        pos.y = utils::clamp<double>(pos.y, 1e-6, NY - 1 - 1e-6);
+        return u.linearExtract(pos);
     }
 
     double velInterpV(mathfu::vec2d pos) {
         pos /= dx;
         pos.x -= 0.5;
-        pos.x = utils::clamp<double>(pos.x, 0, NX);
-        pos.y = utils::clamp<double>(pos.y, 0, NY);
-        return v.triCubic(pos);
+        pos.x = utils::clamp<double>(pos.x, 1e-6, NX - 1 - 1e-6);
+        pos.y = utils::clamp<double>(pos.y, 1e-6, NY - 1 - 1e-6);
+        return v.linearExtract(pos);
     }
 
     mathfu::vec2d velInterp(mathfu::vec2d pos) {

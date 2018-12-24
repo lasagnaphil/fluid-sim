@@ -1,4 +1,5 @@
 //
+//
 // Created by lasagnaphil on 2018-09-18.
 //
 
@@ -30,28 +31,66 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     this->dx = mac.dx = dx;
     this->dr = 0.99 * dx;
     this->rho = rho;
-    this->gravity = gravity;
+    this->gravity = {0, gravity};
+    this->origGravity = this->gravity;
 
     size_t fluidCount = 0;
-    iterate([&](size_t i, size_t j) {
-        if (i == 0 || i == 1 || i == SIZEX - 1 || i == SIZEX - 2 ||
-            j == 0 || j == 1 || j == SIZEY - 1 || j == SIZEX - 2) {
-            cell(i, j) = CellType::SOLID;
-        }
-        else if (i + j < SIZEY * 3 / 4) {
-            cell(i, j) = CellType::FLUID;
-            fluidCount++;
-        }
-        /*
-        else if (i >= (int)(SIZEX*0.7) && i <= (int)(SIZEX*0.9) && j >= (int)(SIZEY*0.7) && j <= (int)(SIZEY*0.9)) {
-            cell(i, j) = CellType::FLUID;
-            fluidCount++;
-        }
-         */
-        else {
-            cell(i, j) = CellType::EMPTY;
-        }
-    });
+
+    int mode = 1;
+    if (mode == 0) {
+        iterate([&](size_t i, size_t j) {
+            if (i == 0 || i == SIZEX - 1 ||
+                j == 0 || j == SIZEY - 1) {
+                cell(i, j) = CellType::SOLID;
+            }
+            else if (i + j < SIZEY * 3 / 4) {
+                cell(i, j) = CellType::FLUID;
+                fluidCount++;
+            }
+            else {
+                cell(i, j) = CellType::EMPTY;
+            }
+        });
+    }
+    else if (mode == 1) {
+        iterate([&](size_t i, size_t j) {
+            if(i == 0 || i == SIZEX - 1 || j == 0 || j == SIZEX - 1) {
+                cell(i, j) = CellType::SOLID;
+            }
+            else if (i >= SIZEX/4 && i < 3*SIZEX/4 && j >= 0*SIZEY/4 && j < 2*SIZEY/4) {
+                cell(i, j) = CellType::FLUID;
+                fluidCount++;
+            }
+            else {
+                cell(i, j) = CellType::EMPTY;
+            }
+        });
+    }
+    else if (mode == 2) {
+        iterate([&](size_t i, size_t j) {
+            if (i == 0 || i == SIZEX - 1 || j == 0 || j == SIZEX - 1) {
+                cell(i, j) = CellType::SOLID;
+            }
+            else if (i < SIZEX/2) {
+                if (j <= i/2 + SIZEY/4) {
+                    cell(i, j) = CellType::FLUID;
+                    fluidCount++;
+                }
+                else {
+                    cell(i, j) = CellType::EMPTY;
+                }
+            }
+            else {
+                if (j <= 3*SIZEY/4 - i/2) {
+                    cell(i, j) = CellType::FLUID;
+                    fluidCount++;
+                }
+                else {
+                    cell(i, j) = CellType::EMPTY;
+                }
+            }
+        });
+    }
     /*
     cell(63,12) = CellType::SOLID;
     cell(63,13) = CellType::SOLID;
@@ -88,12 +127,6 @@ void WaterSim2D::free() {
     perfCounter.free();
 }
 
-vec2d WaterSim2D::clampPos(mathfu::vec2d pos) {
-    pos.x = utils::clamp(pos.x, (2.0 + 1e-12) * dx, (SIZEX - 2 - 1e-12) * dx);
-    pos.y = utils::clamp(pos.y, (2.0 + 1e-12) * dx, (SIZEY - 2 - 1e-12) * dx);
-    return pos;
-}
-
 void WaterSim2D::runFrame() {
 #define STOPWATCH(__CODE) \
     perfCounter.beginStage(); \
@@ -102,11 +135,9 @@ void WaterSim2D::runFrame() {
 
     if (mode == SimMode::SemiLagrangian) {
         stage = StageType::CreateLevelSet;
-        STOPWATCH();
-        // STOPWATCH(createLevelSet());
+        STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        STOPWATCH();
-        // STOPWATCH(updateLevelSet());
+        STOPWATCH(updateLevelSet());
         stage = StageType::ApplySemiLagrangianAdvection;
         STOPWATCH(applySemiLagrangianAdvection());
         stage = StageType::ApplyGravity;
@@ -120,11 +151,9 @@ void WaterSim2D::runFrame() {
     }
     else if (mode == SimMode::PIC) {
         stage = StageType::CreateLevelSet;
-        STOPWATCH();
-        // STOPWATCH(createLevelSet());
+        STOPWATCH(createLevelSet());
         stage = StageType::UpdateLevelSet;
-        STOPWATCH();
-        // STOPWATCH(updateLevelSet());
+        STOPWATCH(updateLevelSet());
         stage = StageType::TransferVelocityToGrid;
         STOPWATCH(transferVelocityToGrid());
         stage = StageType::ApplyGravity;
@@ -230,16 +259,28 @@ void WaterSim2D::transferVelocityToGrid() {
         auto xp = particles[e];
         auto vp = particleVels[e];
         auto upos = vec2d(xp.x / dx, xp.y / dx - 0.5);
-        mac.u.distribute(upos, vp.x);
-        udiv->distribute(upos, 1.0);
+        mac.u.linearDistribute(upos, vp.x);
+        udiv->linearDistribute(upos, 1.0);
         auto vpos = vec2d(xp.x / dx - 0.5, xp.y / dx);
-        mac.v.distribute(vpos, vp.y);
-        vdiv->distribute(vpos, 1.0);
+        mac.v.linearDistribute(vpos, vp.y);
+        vdiv->linearDistribute(vpos, 1.0);
     }
-    mac.u.safeDivBy(*udiv);
-    mac.v.safeDivBy(*vdiv);
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX + 1; i++) {
+            if ((*udiv)(i, j) > 0) mac.u(i, j) /= (*udiv)(i, j);
+        }
+    }
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY + 1; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if ((*vdiv)(i, j) > 0) mac.v(i, j) /= (*vdiv)(i, j);
+        }
+    }
+
     auto uintFlag = new Array2D<uint32_t, SIZEX+1, SIZEY>();
     auto vintFlag = new Array2D<uint32_t, SIZEX, SIZEY+1>();
+
 #pragma omp parallel for
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX + 1; i++) {
@@ -271,8 +312,9 @@ void WaterSim2D::applySemiLagrangianAdvection() {
             auto k1 = mac.velInterp(x_p);
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
-            x_p -= (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
-            mac.u(i,j) = mac.velInterpU(x_p);
+            auto x_p_new = x_p + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
+            x_p_new = clampPos(x_p, x_p_new);
+            mac.u(i,j) = mac.velInterpU(x_p_new);
         }
     }
 
@@ -283,17 +325,25 @@ void WaterSim2D::applySemiLagrangianAdvection() {
             auto k1 = mac.velInterp(x_p);
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
-            x_p -= (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
-            mac.v(i,j) = mac.velInterpV(x_p);
+            auto x_p_new = x_p + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
+            x_p_new = clampPos(x_p, x_p_new);
+            mac.v(i,j) = mac.velInterpV(x_p_new);
         }
     }
+
 }
 
 void WaterSim2D::applyGravity() {
 #pragma omp parallel for
+    for (int j = 0; j < SIZEY; j++) {
+        for (int i = 0; i < SIZEX + 1; i++) {
+            mac.u(i,j) += dt * gravity.x;
+        }
+    }
+#pragma omp parallel for
     for (int j = 0; j < SIZEY + 1; j++) {
         for (int i = 0; i < SIZEX; i++) {
-            mac.v(i,j) += dt * gravity;
+            mac.v(i,j) += dt * gravity.y;
         }
     }
 }
@@ -541,9 +591,9 @@ void WaterSim2D::updateParticleVelocities() {
 #pragma omp parallel for
     for (int e = 0; e < particles.size; e++) {
         vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
-        double velX = mac.u.extract(upos);
+        double velX = mac.u.linearExtract(upos);
         vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
-        double velY = mac.v.extract(vpos);
+        double velY = mac.v.linearExtract(vpos);
         particleVels[e] = vec2d(velX, velY);
     }
 }
@@ -564,7 +614,6 @@ void WaterSim2D::applyAdvection() {
     if (cmax > 5.0) {
         log_warn("Particle velocity violates CFL condition! (C=%f, vel=%f, pos=(%f, %f))",
                 cmax, particles[emax].Length(), particles[emax].x, particles[emax].y);
-        dt *= 5.0 / cmax;
     }
 
     Grid2D<CellType>* oldCell = new Grid2D<CellType>();
@@ -584,21 +633,37 @@ void WaterSim2D::applyAdvection() {
         auto k1 = mac.velInterp(pos);
         auto k2 = mac.velInterp(pos + 0.5*dt*k1);
         auto k3 = mac.velInterp(pos + 0.75*dt*k2);
-        pos = clampPos(pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3);
+
+        auto nextPos = pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
+        pos = clampPos(pos, nextPos);
+
+        if (isnan(pos.x) || isnan(pos.y)) {
+            log_error("Advected position is NaN!");
+        }
         int x = (int)(pos.x/dx), y = (int)(pos.y/dx);
         if (cell(x,y) == CellType::EMPTY) {
             cell(x,y) = CellType::FLUID;
         }
     }
 
+    // Correction to eliminate "bubbles" inside fluids (and on wall boundaries)
 #pragma omp parallel for
-    // Correction to eliminate "bubbles" inside fluids
     for (size_t i = 1; i < SIZEX - 1; i++) {
         for (size_t j = 1; j < SIZEY - 1; j++) {
-            if (cell(i, j) == CellType::EMPTY &&
-                cell(i-1, j) == CellType::FLUID && cell(i+1, j) == CellType::FLUID &&
-                cell(i, j-1) == CellType::FLUID && cell(i, j+1) == CellType::FLUID) {
-                cell(i, j) = CellType::FLUID;
+            if (cell(i, j) == CellType::EMPTY) {
+                int fluidCount = 0;
+                int solidCount = 0;
+                for (auto neighbor : {cell(i-1, j), cell(i+1, j), cell(i,j-1), cell(i,j+1)}) {
+                    if (neighbor == CellType::FLUID) {
+                        fluidCount++;
+                    }
+                    else if (neighbor == CellType::SOLID) {
+                        solidCount++;
+                    }
+                }
+                if (fluidCount == 4 || (fluidCount == 3 && solidCount == 1)) {
+                    cell(i, j) = CellType::FLUID;
+                }
             }
         }
     }
@@ -807,3 +872,32 @@ void WaterSim2D::updateLevelSet() {
         }
     }
 }
+
+mathfu::vec2d WaterSim2D::clampPos(mathfu::vec2d from, mathfu::vec2d to) {
+    if (to.x != from.x) {
+        if (to.x < dx) {
+            double newX = (1 + 1e-6)*dx;
+            to.y = from.y + (to.y - from.y) * (newX - from.x) / (to.x - from.x);
+            to.x = newX;
+        }
+        else if (to.x >= (SIZEX-1)*dx) {
+            double newX = (SIZEX-1 - 1e-6)*dx;
+            to.y = from.y + (to.y - from.y) * (newX - from.x) / (to.x - from.x);
+            to.x = newX;
+        }
+    }
+    if (to.y != from.y) {
+        if (to.y < dx) {
+            double newY = (1 + 1e-6)*dx;
+            to.x = from.x + (to.x - from.x) * (newY - from.y) / (to.y - from.y);
+            to.y = newY;
+        }
+        else if (to.y >= (SIZEY-1)*dx) {
+            double newY = (SIZEY-1 - 1e-6)*dx;
+            to.x = from.x + (to.x - from.x) * (newY - from.y) / (to.y - from.y);
+            to.y = newY;
+        }
+    }
+    return to;
+}
+
