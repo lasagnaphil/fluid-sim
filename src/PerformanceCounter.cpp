@@ -2,7 +2,9 @@
 // Created by lasagnaphil on 2018-11-26.
 //
 
+#include <File.h>
 #include "PerformanceCounter.h"
+#include <string>
 
 PerformanceCounter PerformanceCounter::create(int numStages) {
     PerformanceCounter counter = {};
@@ -42,6 +44,7 @@ void PerformanceCounter::endFrame() {
 
     avgTimePerFrame = 0.0f;
     for (int i = 0; i < average.size; i++) {
+        averageStore.push(average[i]);
         avgTimePerFrame += average[i];
     }
 }
@@ -60,4 +63,22 @@ void PerformanceCounter::renderUI() {
 void PerformanceCounter::free() {
     samples.free();
     average.free();
+}
+
+void PerformanceCounter::saveToFile(const char* filename) {
+    File file = File::open(filename, "w+").unwrap();
+
+    std::string buf;
+
+    int numStages = average.size;
+    for (int i = SampleCount; i < averageStore.size / numStages; i++) {
+        for (int j = 0; j < numStages; j++) {
+            auto str = std::to_string(averageStore[numStages*i + j]);
+            buf += str;
+            buf += ',';
+        }
+        buf += '\n';
+    }
+    file.writeAll(buf.c_str());
+    file.close();
 }

@@ -293,9 +293,6 @@ void WaterRenderer2D::update() {
         auto gravity = GRAVITY_MOUSEDRAG_SCALE * (currRightMousePos - startRightMousePos);
         sim->gravity = vec2d(sim->origGravity.x + gravity.x, sim->origGravity.y + gravity.y);
     }
-    else {
-        sim->gravity = sim->origGravity;
-    }
 }
 
 void WaterRenderer2D::draw() {
@@ -356,7 +353,11 @@ void WaterRenderer2D::drawUI() {
         ImGui::SliderFloat2("Gravity", gravity, -15.0f, 15.0f);
         sim->gravity.x = gravity[0];
         sim->gravity.y = gravity[1];
-
+        ImGui::Checkbox("Gravity oscillation toggle", &sim->oscillateGravity);
+        if (sim->oscillateGravity) {
+            ImGui::SliderFloat("Gravity Amplitude", &sim->oscillateGravityAmp, 0.1f, 10.0f);
+            ImGui::SliderFloat("Gravity Period", &sim->oscillateGravityPeriod, 0.1f, 10.0f);
+        }
     }
     if (ImGui::CollapsingHeader("Data")) {
         ImGui::Text("Current frame: %f", sim->currentTime);

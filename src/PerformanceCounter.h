@@ -22,6 +22,8 @@ struct PerformanceCounter {
     float avgTimePerFrame;
     bool sampleFinished = false;
 
+    Vec<float> averageStore;
+
     static PerformanceCounter create(int numStages);
 
     void beginStage();
@@ -31,6 +33,8 @@ struct PerformanceCounter {
     void endFrame();
 
     void renderUI();
+
+    void saveToFile(const char* filename);
 
     void free();
 };

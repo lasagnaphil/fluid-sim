@@ -8,6 +8,7 @@
 #include <Queue.h>
 #include <math/Utils.h>
 #include <log.h>
+#include <File.h>
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
@@ -119,6 +120,7 @@ void WaterSim2D::setup(double dt, double dx, double dr, double rho, double gravi
 
 void WaterSim2D::free() {
     perfCounter.free();
+    waterVolumeData.free();
 }
 
 void WaterSim2D::runFrame() {
@@ -237,13 +239,6 @@ void WaterSim2D::update() {
      */
 }
 
-double quadraticKernel(double r) {
-    if (r >= -1.5 && r < -0.5) { return 0.5*(r + 1.5)*(r + 1.5); }
-    else if (r >= -0.5 && r < 0.5) { return 0.75 - r*r; }
-    else if (r >= 0.5 && r < 1.5) { return 0.5*(1.5 - r)*(1.5 - r); }
-    else return 0;
-}
-
 void WaterSim2D::transferVelocityToGrid() {
     mac.u.reset();
     mac.v.reset();
@@ -328,6 +323,11 @@ void WaterSim2D::applySemiLagrangianAdvection() {
 }
 
 void WaterSim2D::applyGravity() {
+    static float t = 0.0f;
+    t += dt;
+    if (oscillateGravity) {
+        gravity.x = oscillateGravityAmp * sin(2*M_PI* t / oscillateGravityPeriod);
+    }
 #pragma omp parallel for
     for (int j = 0; j < SIZEY; j++) {
         for (int i = 0; i < SIZEX + 1; i++) {
@@ -813,10 +813,23 @@ void WaterSim2D::createWaterLevelSet() {
         }
     }
     waterVolume = fluidCount * dx * dx;
+    waterVolumeData.push(waterVolume);
 }
 
 void WaterSim2D::createSolidLevelSet() {
     // TODO
+}
+
+void WaterSim2D::saveStats() {
+    perfCounter.saveToFile("perf.csv");
+    File file = File::open("volume.csv", "w+").unwrap();
+    std::string buf;
+    for (int i = 0; i < waterVolumeData.size; i++) {
+        buf += std::to_string(waterVolumeData[i]);
+        buf += '\n';
+    }
+    file.writeAll(buf.c_str());
+    file.close();
 }
 
 void LevelSet::constructFromParticles(Vec<mathfu::vec2d> particles, double dr) {

@@ -60,6 +60,10 @@ struct WaterSim2D {
     mathfu::vec2d origGravity = {0, -9.81};
     double rho = 997.0;
 
+    bool oscillateGravity = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY;
+    float oscillateGravityAmp = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY_AMP;
+    float oscillateGravityPeriod = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY_PERIOD;
+
     bool rendered = false;
     double currentTime = 0.0f;
 
@@ -83,6 +87,7 @@ struct WaterSim2D {
 
     double origWaterVolume = 0.0;
     double waterVolume = 0.0;
+    Vec<double> waterVolumeData = {};
 
     void setup(double dt, double dx, double dr, double rho, double gravity);
 
@@ -116,8 +121,7 @@ struct WaterSim2D {
 
     mathfu::vec2d getGridCenter();
 
-    void createLevelSet();
-    void updateLevelSet();
+    void saveStats();
 
     mathfu::vec2d clampPos(mathfu::vec2d from, mathfu::vec2d to);
 

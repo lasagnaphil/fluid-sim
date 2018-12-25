@@ -153,6 +153,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
 
 void App::free() {
     if (mode == Mode::Dim2) {
+        waterSim2D->saveStats();
         waterSim2D->free();
         delete waterSim2D;
         delete waterRenderer2D;
@@ -245,6 +246,7 @@ void App::start() {
         SDL_GL_SwapWindow(window);
 
         /*
+        int msPerFrame = 16;
         Uint32 totalFrameTime = SDL_GetTicks() - frameTime;
         if (totalFrameTime < msPerFrame) {
             SDL_Delay(msPerFrame - (SDL_GetTicks() - frameTime));
