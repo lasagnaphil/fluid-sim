@@ -19,11 +19,12 @@ struct WaterSimSettings {
     struct Dim2D {
         static constexpr int SIZEX = 128;
         static constexpr int SIZEY = 128;
-        static constexpr double DT = 0.0005;
+        static constexpr double DT = 0.005;
         static constexpr double DX = 0.001;
         static constexpr int PARTICLES_PER_CELL_SQRT = 2;
-        static constexpr SimMode SIM_MODE = SimMode::PIC;
-    };
+        static constexpr SimMode SIM_MODE = SimMode::SemiLagrangian;
+        static constexpr int INIT_STATE = 0;
+    }SemiLagrangian;
 };
 
 #endif //FLUID_SIM_WATERSIMSETTINGS_H

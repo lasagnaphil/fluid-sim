@@ -252,12 +252,12 @@ void WaterRenderer2D::update() {
         sim->rendered = true;
     }
 
-    // Change velocity using mouse drag
-    /*
+    auto inputMgr = InputManager::get();
+
+    // Change velocity using mouse drag (only works for Semi-Lagrangian for now)
     static vec2f startLeftMousePos;
     vec2f currLeftMousePos;
     constexpr float VEL_MOUSEDRAG_SCALE = 0.1f;
-    auto inputMgr = InputManager::get();
     if (inputMgr->isMouseEntered(SDL_BUTTON_LEFT)) {
         startLeftMousePos = vec2f(inputMgr->getMousePos());
     }
@@ -280,12 +280,11 @@ void WaterRenderer2D::update() {
             sim->mac.v(vx, vy) += velIncrease.y;
         }
     }
-     */
+
     // Change gravity using mouse drag
     static vec2f startRightMousePos;
     vec2f currRightMousePos;
     constexpr float GRAVITY_MOUSEDRAG_SCALE = 0.002f;
-    auto inputMgr = InputManager::get();
     if (inputMgr->isMouseEntered(SDL_BUTTON_RIGHT)) {
         startRightMousePos = vec2f(inputMgr->getMousePos());
     }
@@ -368,6 +367,14 @@ void WaterRenderer2D::drawUI() {
         ImGui::Text("Max velocity in fluid: %f", maxVelocity);
         double CFLnum = sim->dt * maxVelocity / sim->dx;
         ImGui::Text("CFL Number: %f", CFLnum);
+        ImGui::Text("Original fluid volume: %f", sim->origWaterVolume);
+        ImGui::Text("Current fluid volume: %f", sim->waterVolume);
+        if (sim->origWaterVolume < sim->waterVolume) {
+            ImGui::Text("(%f %% volume increase) ", (sim->waterVolume - sim->origWaterVolume) / sim->origWaterVolume * 100.f);
+        }
+        else if (sim->origWaterVolume > sim->waterVolume) {
+            ImGui::Text("(%f %% volume decrease) ", (sim->origWaterVolume - sim->waterVolume) / sim->origWaterVolume * 100.f);
+        }
         ImGui::Text("Current timestep: %f", sim->dt);
     }
     if (ImGui::CollapsingHeader("Options")) {
@@ -433,56 +440,7 @@ void WaterRenderer2D::updateBuffers() {
     phiCellValues.size = 0;
     if (renderLevelSet) {
         sim->iterate([&](size_t i, size_t j) {
-            phiCellValues.push(utils::sigmoid<float>(100.0f * sim->phi(i,j)));
+            phiCellValues.push(utils::sigmoid<float>(100.0f * sim->waterLevelSet.phi(i,j)));
         });
     }
 }
-
-/*
-void WaterRenderer2D::createWaterMesh() {
-    float dx = (float)sim->dx;
-    StackVec<vec2p, 4> contourLookupTable[16] = {};
-    contourLookupTable[1].push(HMM_Vec2(0, 0.5f));
-    contourLookupTable[1].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[2].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[2].push(HMM_Vec2(1, 0.5f));
-    contourLookupTable[3].push(HMM_Vec2(0, 0.5f));
-    contourLookupTable[3].push(HMM_Vec2(1, 0.5f));
-    contourLookupTable[4].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[4].push(HMM_Vec2(1, 0.5f));
-    contourLookupTable[5].push(HMM_Vec2(0, 0.5f));
-    contourLookupTable[5].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[5].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[5].push(HMM_Vec2(1, 0.5f));
-    contourLookupTable[6].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[6].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[7].push(HMM_Vec2(0, 0.5f));
-    contourLookupTable[7].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[8].push(HMM_Vec2(0, 0.5f));
-    contourLookupTable[8].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[9].push(HMM_Vec2(0.5f, 0));
-    contourLookupTable[9].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
-    contourLookupTable[10].push(HMM_Vec2(0.5f, 1));
-
-    auto phiSign = new Array2D<bool, SIZEX, SIZEY>();
-    defer {delete phiSign;};
-    sim->iterate([&](size_t i, size_t j) {
-        (*phiSign)(i,j) = sim->phi(i,j) > 0;
-    });
-
-    for (size_t j = 0; j < SIZEY - 1; j++) {
-        for (size_t i = 0; i < SIZEX - 1; i++) {
-            int key = ((*phiSign)(i+1,j+1) * 8) + ((*phiSign)(i,j+1) * 4)
-                      + ((*phiSign)(i+1,j) * 2) + ((*phiSign)(i,j));
-            switch (key) {
-                case 0:
-
-            }
-
-        }
-    }
-}
- */

@@ -14,6 +14,25 @@
 #include "MACGrid2D.h"
 #include "PerformanceCounter.h"
 
+struct LevelSet {
+    static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
+    static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
+
+    Array2D<double, SIZEX, SIZEY> phi = {};
+    double dx;
+
+    static LevelSet create(double dx) {
+        LevelSet levelSet;
+        levelSet.dx = dx;
+        return levelSet;
+    }
+
+    void constructFromParticles(Vec<mathfu::vec2d> particles, double dr);
+    void redistance();
+
+    template <typename Fun> void fastSweepIterate(Fun f);
+};
+
 struct WaterSim2D {
     static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
     static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
@@ -33,8 +52,9 @@ struct WaterSim2D {
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
     Vec<mathfu::vec2d> particles = {};
-    Array2D<double, SIZEX, SIZEY> phi = {};
     Vec<mathfu::vec2d> particleVels = {};
+
+    LevelSet waterLevelSet;
 
     mathfu::vec2d gravity = {0, -9.81};
     mathfu::vec2d origGravity = {0, -9.81};
@@ -45,11 +65,11 @@ struct WaterSim2D {
 
     double dt = 0.0001;
     double dx = 0.001;
-    double dr = 0.0009; // water particle radius
+    double dr = 0.0011; // water particle radius
 
     enum class StageType {
-        Init, CreateLevelSet, UpdateLevelSet, TransferVelocityToGrid,
-        ApplySemiLagrangianAdvection, ApplyGravity, ApplyProjection,
+        Init, CreateWaterLevelSet, TransferVelocityToGrid,
+        ApplySemiLagrangianAdvection, ApplyGravity, CreateSolidLevelSet, ApplyProjection,
         UpdateVelocity, UpdateParticleVelocities, ApplyAdvection
     };
     int numStages;
@@ -61,6 +81,9 @@ struct WaterSim2D {
 
     PerformanceCounter perfCounter;
 
+    double origWaterVolume = 0.0;
+    double waterVolume = 0.0;
+
     void setup(double dt, double dx, double rho, double gravity);
 
     void free();
@@ -69,11 +92,15 @@ struct WaterSim2D {
 
     void update();
 
+    void createWaterLevelSet();
+
     void applySemiLagrangianAdvection();
 
     void transferVelocityToGrid();
 
     void applyGravity();
+
+    void createSolidLevelSet();
 
     void applyProjection();
 
@@ -130,41 +157,14 @@ struct WaterSim2D {
         }
     }
 
-    template <typename Fun>
-    void fastSweepIterate(Fun f) {
-        // Sweep with four possible directions, two times (to make sure)
-        for (int k = 0; k < 4; k++) {
-            for (size_t j = 0; j < SIZEY; j++) {
-                for (size_t i = 0; i < SIZEX; i++) {
-                    f(i, j);
-                }
-            }
-            for (size_t j = 0; j < SIZEY; j++) {
-                for (size_t i = SIZEX; i-- > 0;) {
-                    f(i, j);
-                }
-            }
-            for (size_t j = SIZEY; j-- > 0; ) {
-                for (size_t i = 0; i < SIZEX; i++) {
-                    f(i, j);
-                }
-            }
-            for (size_t j = SIZEY; j-- > 0; ) {
-                for (size_t i = SIZEX; i-- > 0;) {
-                    f(i, j);
-                }
-            }
-        }
-    }
-
     const char* printStage() {
         switch(stage) {
             case StageType::Init: return "Init";
-            case StageType::CreateLevelSet: return "CreateLevelSet";
-            case StageType::UpdateLevelSet: return "UpdateLevelSet";
+            case StageType::CreateWaterLevelSet: return "CreateWaterLevelSet";
             case StageType::TransferVelocityToGrid: return "TransferVelocityToGrid";
             case StageType::ApplySemiLagrangianAdvection: return "ApplySemiLagrangianAdvection";
             case StageType::ApplyGravity: return "ApplyGravity";
+            case StageType::CreateSolidLevelSet: return "CreateSolidLevelSet";
             case StageType::ApplyProjection: return "ApplyProjection";
             case StageType::UpdateVelocity: return "UpdateVelocity";
             case StageType::UpdateParticleVelocities: return "UpdateParticleVelocities";
@@ -174,5 +174,31 @@ struct WaterSim2D {
     }
 };
 
+template<typename Fun>
+void LevelSet::fastSweepIterate(Fun f) {
+    // Sweep with four possible directions, two times (to make sure)
+    for (int k = 0; k < 4; k++) {
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                f(i, j);
+            }
+        }
+        for (size_t j = 0; j < SIZEY; j++) {
+            for (size_t i = SIZEX; i-- > 0;) {
+                f(i, j);
+            }
+        }
+        for (size_t j = SIZEY; j-- > 0; ) {
+            for (size_t i = 0; i < SIZEX; i++) {
+                f(i, j);
+            }
+        }
+        for (size_t j = SIZEY; j-- > 0; ) {
+            for (size_t i = SIZEX; i-- > 0;) {
+                f(i, j);
+            }
+        }
+    }
+}
 
 #endif //FLUID_SIM_WATERSIM2D_H

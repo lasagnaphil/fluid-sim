@@ -76,7 +76,7 @@ private:
     bool renderParticleVels = true;
     bool renderCells = true;
     bool renderCellVels = false;
-    bool renderPressures = true;
+    bool renderPressures = false;
     bool renderLevelSet = false;
 
     static const char* particleVS;
