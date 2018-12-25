@@ -662,6 +662,7 @@ void WaterSim2D::applyAdvection() {
                 cmax, particles[emax].Length(), particles[emax].x, particles[emax].y);
     }
 
+
     #pragma omp parallel for
     for (int i = 0; i < particles.size; i++) {
         auto& pos = particles[i];
@@ -678,6 +679,7 @@ void WaterSim2D::applyAdvection() {
         }
         pos = nextPos;
     }
+
 }
 
 
@@ -778,6 +780,14 @@ void WaterSim2D::createWaterLevelSet() {
         }
     }
 
+#pragma omp parallel for
+    for (int i = 0; i < particles.size; i++) {
+        auto pos = particles[i];
+        int x = (int)pos.x; int y = (int)pos.y;
+        if (cell(x, y) == CellType::EMPTY) {
+            cell(x, y) = CellType::FLUID;
+        }
+    }
 
     // Correction to eliminate "bubbles" inside fluids (and on wall boundaries)
 #pragma omp parallel for
