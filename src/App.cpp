@@ -135,7 +135,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
     // load systems
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
-        waterSim2D->setup(WaterSimSettings::Dim2D::DT, WaterSimSettings::Dim2D::DX, 997.0, -9.81);
+        waterSim2D->setup(WaterSimSettings::Dim2D::DT, WaterSimSettings::Dim2D::DX, WaterSimSettings::Dim2D::DR, 997.0, -9.81);
         camera2d = Camera2D::create(&settings, vec2f(waterSim2D->getGridCenter()));
         camera2d.zoom = 64.0f * (0.001 / waterSim2D->dx);
         waterRenderer2D = new WaterRenderer2D();

@@ -11,13 +11,16 @@
 #include "WaterSim2D.h"
 #include "InputManager.h"
 
+#define USE_GHOST_PRESSURE
+#define USE_LEVEL_SET
+
 using namespace mathfu;
 
 inline double randf(float max) {
     return ((double)rand()/(double)RAND_MAX) * max;
 }
 
-void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
+void WaterSim2D::setup(double dt, double dx, double dr, double rho, double gravity) {
 
     if (mode == SimMode::SemiLagrangian) {
         numStages = 7;
@@ -29,14 +32,14 @@ void WaterSim2D::setup(double dt, double dx, double rho, double gravity) {
     perfCounter = PerformanceCounter::create(numStages);
     this->dt = dt;
     this->dx = mac.dx = dx;
-    this->dr = 0.99 * dx;
+    this->dr = dr;
     this->rho = rho;
     this->gravity = {0, gravity};
     this->origGravity = this->gravity;
 
     size_t fluidCount = 0;
 
-    int initState = 0;
+    int initState = WaterSimSettings::Dim2D::INIT_STATE;
     if (initState == 0) {
         iterate([&](size_t i, size_t j) {
             if (i == 0 || i == SIZEX - 1 ||
@@ -348,6 +351,49 @@ void WaterSim2D::applyProjection() {
 
     // calculate lhs (matrix A)
     double scaleA = dt / (rho * dx * dx);
+#ifdef USE_GHOST_PRESSURE
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if (cell(i,j) == CellType::FLUID) {
+                if (cell(i-1,j) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                }
+                else if (cell(i-1,j) == CellType::EMPTY) {
+                    double phi1 = waterLevelSet.phi(i-1, j);
+                    double phi0 = waterLevelSet.phi(i, j);
+                    Adiag(i,j) -= scaleA * utils::max(phi1 / phi0, -1e3);
+                }
+                if (cell(i+1,j) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                    Ax(i,j) = -scaleA;
+                }
+                else if (cell(i+1,j) == CellType::EMPTY) {
+                    double phi1 = waterLevelSet.phi(i+1, j);
+                    double phi0 = waterLevelSet.phi(i, j);
+                    Adiag(i,j) += scaleA * (1 - utils::max(phi1 / phi0, -1e3));
+                }
+                if (cell(i,j-1) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                }
+                else if (cell(i,j-1) == CellType::EMPTY) {
+                    double phi1 = waterLevelSet.phi(i, j-1);
+                    double phi0 = waterLevelSet.phi(i, j);
+                    Adiag(i,j) -= scaleA * utils::max(phi1 / phi0, -1e3);
+                }
+                if (cell(i,j+1) == CellType::FLUID) {
+                    Adiag(i,j) += scaleA;
+                    Ay(i,j) = -scaleA;
+                }
+                else if (cell(i,j+1) == CellType::EMPTY) {
+                    double phi1 = waterLevelSet.phi(i, j+1);
+                    double phi0 = waterLevelSet.phi(i, j);
+                    Adiag(i,j) += scaleA * (1 - utils::max(phi1 / phi0, -1e3));
+                }
+            }
+        }
+    }
+#else
 #pragma omp parallel for
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
@@ -375,6 +421,7 @@ void WaterSim2D::applyProjection() {
             }
         }
     }
+#endif
 
     auto& rhs = gridStack.newItem();
 
@@ -524,20 +571,20 @@ void WaterSim2D::updateVelocity() {
                     if ((i == 0 || cell(i-1,j) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
                         mac.u(i,j) = 0; // usolid(i,j);
                     }
-                    /*
+#ifdef USE_GHOST_PRESSURE
                     else if (i > 0 && cell(i-1,j) == CellType::EMPTY) {
                         // account for ghost pressures
-                        double phi1 = waterLevelSet.phi(i, j);
-                        double phi0 = waterLevelSet.phi(i-1, j);
-                        mac.u(i,j) -= scale * utils::min((phi1 - phi0) / phi1, 1e2) * p(i,j);
+                        double phi1 = waterLevelSet.phi(i-1, j);
+                        double phi0 = waterLevelSet.phi(i, j);
+                        mac.u(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i-1, j);
-                        mac.u(i,j) -= scale * utils::min((phi1 - phi0) / phi0, 1e2) * p(i-1,j);
+                        mac.u(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i-1,j);
                     }
-                     */
+#endif
                     else if (i > 0) {
                         mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
                     }
@@ -553,20 +600,20 @@ void WaterSim2D::updateVelocity() {
                     if ((j == 0 || cell(i,j-1) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
                         mac.v(i,j) = 0; // vsolid(i,0)
                     }
-                    /*
+#ifdef USE_GHOST_PRESSURE
                     else if (j > 0 && cell(i,j-1) == CellType::EMPTY) {
                         // account for ghost pressures
-                        double phi1 = waterLevelSet.phi(i, j);
-                        double phi0 = waterLevelSet.phi(i, j-1);
-                        mac.v(i,j) -= scale * utils::min((phi1 - phi0) / phi1, 1e2) * p(i,j);
+                        double phi1 = waterLevelSet.phi(i, j-1);
+                        double phi0 = waterLevelSet.phi(i, j);
+                        mac.v(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i, j-1);
-                        mac.v(i,j) -= scale * utils::min((phi1 - phi0) / phi0, 1e2) * p(i,j-1);
+                        mac.v(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i,j-1);
                     }
-                     */
+#endif
                     else if (j > 0) {
                         mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
                     }
@@ -615,15 +662,7 @@ void WaterSim2D::applyAdvection() {
                 cmax, particles[emax].Length(), particles[emax].x, particles[emax].y);
     }
 
-#pragma omp parallel for
-    for (size_t j = 0; j < SIZEY; j++) {
-        for (size_t i = 0; i < SIZEX; i++) {
-            if(cell(i,j) == CellType::FLUID) {
-                cell(i,j) = CellType::EMPTY;
-            }
-        }
-    }
-#pragma omp parallel for
+    #pragma omp parallel for
     for (int i = 0; i < particles.size; i++) {
         auto& pos = particles[i];
         auto k1 = mac.velInterp(pos);
@@ -638,33 +677,6 @@ void WaterSim2D::applyAdvection() {
             exit(1);
         }
         pos = nextPos;
-
-        int x = (int)(pos.x/dx), y = (int)(pos.y/dx);
-        if (cell(x,y) == CellType::EMPTY) {
-            cell(x,y) = CellType::FLUID;
-        }
-    }
-
-    // Correction to eliminate "bubbles" inside fluids (and on wall boundaries)
-#pragma omp parallel for
-    for (size_t i = 1; i < SIZEX - 1; i++) {
-        for (size_t j = 1; j < SIZEY - 1; j++) {
-            if (cell(i, j) == CellType::EMPTY) {
-                int fluidCount = 0;
-                int solidCount = 0;
-                for (auto neighbor : {cell(i-1, j), cell(i+1, j), cell(i,j-1), cell(i,j+1)}) {
-                    if (neighbor == CellType::FLUID) {
-                        fluidCount++;
-                    }
-                    else if (neighbor == CellType::SOLID) {
-                        solidCount++;
-                    }
-                }
-                if (fluidCount == 4 || (fluidCount == 3 && solidCount == 1)) {
-                    cell(i, j) = CellType::FLUID;
-                }
-            }
-        }
     }
 }
 
@@ -744,6 +756,7 @@ mathfu::vec2d WaterSim2D::clampPos(mathfu::vec2d from, mathfu::vec2d to) {
 }
 
 void WaterSim2D::createWaterLevelSet() {
+#ifdef USE_LEVEL_SET
     waterLevelSet.constructFromParticles(particles, dr);
     waterLevelSet.redistance();
     for (size_t j = 0; j < SIZEY; j++) {
@@ -754,6 +767,43 @@ void WaterSim2D::createWaterLevelSet() {
             }
         }
     }
+#else
+
+#pragma omp parallel for
+    for (size_t j = 0; j < SIZEY; j++) {
+        for (size_t i = 0; i < SIZEX; i++) {
+            if(cell(i,j) == CellType::FLUID) {
+                cell(i,j) = CellType::EMPTY;
+            }
+        }
+    }
+
+
+    // Correction to eliminate "bubbles" inside fluids (and on wall boundaries)
+#pragma omp parallel for
+    for (size_t i = 1; i < SIZEX - 1; i++) {
+        for (size_t j = 1; j < SIZEY - 1; j++) {
+            if (cell(i, j) == CellType::EMPTY) {
+                int fluidCount = 0;
+                int solidCount = 0;
+                for (auto neighbor : {cell(i-1, j), cell(i+1, j), cell(i,j-1), cell(i,j+1)}) {
+                    if (neighbor == CellType::FLUID) {
+                        fluidCount++;
+                    }
+                    else if (neighbor == CellType::SOLID) {
+                        solidCount++;
+                    }
+                }
+                if (fluidCount == 4 || (fluidCount == 3 && solidCount == 1)) {
+                    cell(i, j) = CellType::FLUID;
+                }
+            }
+        }
+    }
+
+#endif
+
+    // compute water volume
     int fluidCount = 0;
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
@@ -777,11 +827,6 @@ void LevelSet::constructFromParticles(Vec<mathfu::vec2d> particles, double dr) {
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
             phi(i,j) = HUGE_VAL;
-        }
-    }
-#pragma omp parallel for
-    for (size_t j = 0; j < SIZEY; j++) {
-        for (size_t i = 0; i < SIZEX; i++) {
             (*t)(i, j) = (size_t) -1;
         }
     }
@@ -829,23 +874,26 @@ void LevelSet::redistance() {
     for (size_t j = 0; j < SIZEY - 1; j++) {
         for (size_t i = 0; i < SIZEX - 1; i++) {
             using utils::sgn;
-            if (sgn((*oldPhi)(i,j)) * sgn((*oldPhi)(i+1,j)) < 0) {
-                double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i+1,j));
-                double theta2 = (*oldPhi)(i+1,j) / ((*oldPhi)(i+1,j) - (*oldPhi)(i,j));
-                double phi0 = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
-                if (abs(phi0) < abs(phi(i,j))) phi(i,j) = phi0;
-                double phi1 = utils::sgn((*oldPhi)(i+1,j)) * theta2 * dx;
-                if (abs(phi1) < abs(phi(i+1,j))) phi(i+1,j) = phi1;
+            double phi0 = (*oldPhi)(i,j);
+            double phi1 = (*oldPhi)(i+1,j);
+            double phi2 = (*oldPhi)(i,j+1);
+            if (phi0 * phi1 < 0 && abs(phi0 - phi1) > dx) {
+                double theta0 = phi0 / (phi0 - phi1);
+                double theta1 = phi1 / (phi0 - phi1);
+                double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
+                double newPhi1 = utils::sgn(phi1) * theta1 * dx;
+                if (abs(newPhi1) < abs(phi1)) phi(i+1,j) = phi1;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i+1,j) = true;
             }
-            if (sgn((*oldPhi)(i,j)) * sgn((*oldPhi)(i,j+1)) < 0) {
-                double theta1 = (*oldPhi)(i,j) / ((*oldPhi)(i,j) - (*oldPhi)(i,j+1));
-                double theta2 = (*oldPhi)(i,j+1) / ((*oldPhi)(i,j+1) - (*oldPhi)(i,j));
-                double phi0 = utils::sgn((*oldPhi)(i,j)) * theta1 * dx;
-                if (abs(phi0) < abs(phi(i,j))) phi(i,j) = phi0;
-                double phi2 = utils::sgn((*oldPhi)(i,j+1)) * theta2 * dx;
-                if (abs(phi2) < abs(phi(i,j+1))) phi(i,j+1) = phi2;
+            if (phi0 * phi2 < 0 && abs(phi0 - phi2) > dx) {
+                double theta0 = phi0 / (phi0 - phi2);
+                double theta2 = phi2 / (phi0 - phi2);
+                double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
+                double newPhi2 = utils::sgn(phi2) * theta2 * dx;
+                if (abs(newPhi2) < abs(phi2)) phi(i,j+1) = phi2;
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i,j+1) = true;
             }
@@ -861,7 +909,7 @@ void LevelSet::redistance() {
     }
 
     using utils::sgn;
-    for (int k = 0; k < 8; k++) {
+    for (int k = 0; k < 4; k++) {
         for (size_t j = 1; j < SIZEY; j++) {
             for (size_t i = 1; i < SIZEX; i++) {
                 if (phi(i,j) >= 0) continue;
@@ -871,8 +919,8 @@ void LevelSet::redistance() {
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
-                if (d < abs(phi(i,j))) {
-                    phi(i,j) = sgn(phi(i,j)) * d;
+                if (d < -phi(i,j)) {
+                    phi(i,j) = -d;
                 }
             }
         }
@@ -885,8 +933,8 @@ void LevelSet::redistance() {
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
-                if (d < abs(phi(i,j))) {
-                    phi(i,j) = sgn(phi(i,j)) * d;
+                if (d < -phi(i,j)) {
+                    phi(i,j) = -d;
                 }
             }
         }
@@ -899,8 +947,8 @@ void LevelSet::redistance() {
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
-                if (d < abs(phi(i,j))) {
-                    phi(i,j) = sgn(phi(i,j)) * d;
+                if (d < -phi(i,j)) {
+                    phi(i,j) = -d;
                 }
             }
         }
@@ -913,16 +961,16 @@ void LevelSet::redistance() {
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
                 }
-                if (d < abs(phi(i,j))) {
-                    phi(i,j) = sgn(phi(i,j)) * d;
+                if (d < -phi(i,j)) {
+                    phi(i,j) = -d;
                 }
             }
         }
     }
 
-    oldPhi->copyFrom(phi);
     // Run smoothing kernel two times to remove any holes
     for (int k = 0; k < 2; k++) {
+        oldPhi->copyFrom(phi);
     #pragma omp parallel for
         for (size_t j = 1; j < SIZEY-1; j++) {
             for (size_t i = 1; i < SIZEX-1; i++) {

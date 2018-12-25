@@ -21,9 +21,10 @@ struct WaterSimSettings {
         static constexpr int SIZEY = 128;
         static constexpr double DT = 0.005;
         static constexpr double DX = 0.001;
+        static constexpr double DR = 0.0009;
         static constexpr int PARTICLES_PER_CELL_SQRT = 2;
         static constexpr SimMode SIM_MODE = SimMode::SemiLagrangian;
-        static constexpr int INIT_STATE = 0;
+        static constexpr int INIT_STATE = 2;
     }SemiLagrangian;
 };
 

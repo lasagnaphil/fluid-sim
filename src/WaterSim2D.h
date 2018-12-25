@@ -65,7 +65,7 @@ struct WaterSim2D {
 
     double dt = 0.0001;
     double dx = 0.001;
-    double dr = 0.0011; // water particle radius
+    double dr = 0.0009; // water particle radius
 
     enum class StageType {
         Init, CreateWaterLevelSet, TransferVelocityToGrid,
@@ -84,7 +84,7 @@ struct WaterSim2D {
     double origWaterVolume = 0.0;
     double waterVolume = 0.0;
 
-    void setup(double dt, double dx, double rho, double gravity);
+    void setup(double dt, double dx, double dr, double rho, double gravity);
 
     void free();
 
