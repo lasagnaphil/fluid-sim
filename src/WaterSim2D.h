@@ -49,6 +49,7 @@ struct WaterSim2D {
     };
 
     MACGrid2D<SIZEX, SIZEY> mac = {};
+    MACGrid2D<SIZEX, SIZEY> newMac = {};
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
     Vec<mathfu::vec2d> particles = {};
@@ -63,6 +64,7 @@ struct WaterSim2D {
     bool oscillateGravity = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY;
     float oscillateGravityAmp = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY_AMP;
     float oscillateGravityPeriod = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY_PERIOD;
+    float picFlipAlpha = WaterSimSettings::Dim2D::PIC_FLIP_INTERP_ALPHA;
 
     bool rendered = false;
     double currentTime = 0.0f;

@@ -28,7 +28,8 @@ struct WaterSimSettings {
         static constexpr bool OSCILLATE_GRAVITY = true;
         static constexpr float OSCILLATE_GRAVITY_AMP = 1.0f;
         static constexpr float OSCILLATE_GRAVITY_PERIOD = 2.0f;
-    }SemiLagrangian;
+        static constexpr float PIC_FLIP_INTERP_ALPHA = 0.8;
+    };
 };
 
 #endif //FLUID_SIM_WATERSIMSETTINGS_H

@@ -76,6 +76,22 @@ struct alignas(32) Array2D<double, NX, NY> {
         std::free(p);
     }
 
+    Array2D operator-(const Array2D& rhs) {
+        Array2D<double, NX, NY> result;
+#ifdef USE_AVX_SIMD
+        for (size_t i = 0; i < NY*NX; i += 4) {
+            __m256d asimd = _mm256_load_pd((double*)data + i);
+            __m256d bsimd = _mm256_load_pd((double*)rhs.data+ i);
+            _mm256_store_pd((double*)result.data + i, _mm256_sub_pd(asimd, bsimd));
+        }
+#else
+        for (size_t j = 0; j < NY; j++)
+            for (size_t i = 0; i < NX; i++)
+                result(i,j) = (*this)(i,j) - rhs(i,j);
+#endif
+        return result;
+    }
+
     Array2D& operator+=(const Array2D& rhs) {
 #ifdef USE_AVX_SIMD
         for (size_t i = 0; i < NY*NX; i += 4) {

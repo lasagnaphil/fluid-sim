@@ -561,7 +561,7 @@ void WaterSim2D::updateVelocity() {
     defer {delete du;};
     auto dv = new Array2D<uint32_t, SIZEX, SIZEY+1>;
     defer {delete dv;};
-
+    newMac = mac;
     {
         double scale = dt / (rho * dx);
 #pragma omp parallel for
@@ -569,27 +569,27 @@ void WaterSim2D::updateVelocity() {
             for (size_t i = 0; i < SIZEX; i++) {
                 if ((i > 0 && cell(i-1,j) == CellType::FLUID) || cell(i,j) == CellType::FLUID) {
                     if ((i == 0 || cell(i-1,j) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
-                        mac.u(i,j) = 0; // usolid(i,j);
+                        newMac.u(i,j) = 0; // usolid(i,j);
                     }
 #ifdef USE_GHOST_PRESSURE
                     else if (i > 0 && cell(i-1,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i-1, j);
                         double phi0 = waterLevelSet.phi(i, j);
-                        mac.u(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
+                        newMac.u(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i-1, j);
-                        mac.u(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i-1,j);
+                        newMac.u(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i-1,j);
                     }
 #endif
                     else if (i > 0) {
-                        mac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
+                        newMac.u(i,j) -= scale * (p(i,j) - p(i-1,j));
                     }
                     else {
-                        mac.u(i,j) = 0; // usolid(0,j)
+                        newMac.u(i,j) = 0; // usolid(0,j)
                     }
                 }
                 else {
@@ -598,27 +598,27 @@ void WaterSim2D::updateVelocity() {
                 }
                 if ((j > 0 && cell(i,j-1) == CellType::FLUID) || cell(i,j) == CellType::FLUID) {
                     if ((j == 0 || cell(i,j-1) == CellType::SOLID) || cell(i,j) == CellType::SOLID) {
-                        mac.v(i,j) = 0; // vsolid(i,0)
+                        newMac.v(i,j) = 0; // vsolid(i,0)
                     }
 #ifdef USE_GHOST_PRESSURE
                     else if (j > 0 && cell(i,j-1) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j-1);
                         double phi0 = waterLevelSet.phi(i, j);
-                        mac.v(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
+                        newMac.v(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i, j-1);
-                        mac.v(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i,j-1);
+                        newMac.v(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i,j-1);
                     }
 #endif
                     else if (j > 0) {
-                        mac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
+                        newMac.v(i,j) -= scale * (p(i,j) - p(i,j-1));
                     }
                     else {
-                        mac.v(i,j) = 0; // vsolid(i,0)
+                        newMac.v(i,j) = 0; // vsolid(i,0)
                     }
                 }
                 else {
@@ -629,21 +629,30 @@ void WaterSim2D::updateVelocity() {
         }
     }
 
-    mac.u.extrapolate(*du);
-    mac.v.extrapolate(*dv);
-}
+    newMac.u.extrapolate(*du);
+    newMac.v.extrapolate(*dv);
 
-void WaterSim2D::updateParticleVelocities() {
-#pragma omp parallel for
-    for (int e = 0; e < particles.size; e++) {
-        vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
-        double velX = mac.u.linearExtract(upos);
-        vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
-        double velY = mac.v.linearExtract(vpos);
-        particleVels[e] = vec2d(velX, velY);
+    if (mode == SimMode::SemiLagrangian) {
+        mac = newMac;
     }
 }
 
+void WaterSim2D::updateParticleVelocities() {
+    // PIC update
+    Array2D<double, SIZEX+1, SIZEY> uDiff = newMac.u - mac.u;
+    Array2D<double, SIZEX, SIZEY+1> vDiff = newMac.v - mac.v;
+
+#pragma omp parallel for
+    for (int e = 0; e < particles.size; e++) {
+        vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
+        vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
+        vec2d picVel = {newMac.u.linearExtract(upos), newMac.v.linearExtract(vpos)};
+        vec2d flipVel = particleVels[e] + vec2d {uDiff.linearExtract(upos), vDiff.linearExtract(vpos)};
+        particleVels[e] = (double)picFlipAlpha * picVel + (1 - (double)picFlipAlpha) * flipVel;
+    }
+
+    mac = newMac;
+}
 
 void WaterSim2D::applyAdvection() {
     // Change timestep to apply CFL condition
