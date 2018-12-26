@@ -11,6 +11,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{graphicx}
+\usepackage{enumitem}
 \graphicspath{ {./images/} }
  
 \begin{CJK}{UTF8}{mj}
@@ -44,7 +45,7 @@
 ^3 \rightarrow \mathbb{R}^3$ 나타낼 수 있는데, 다음과 같은 편미분방정식을 만족한다.
 
 \begin{equation}
-  \frac{\partial u}{\partial t} + \vec{u} \cdot \nabla{\vec{u}} + \frac{1}{\rho} \nabla{\vec{p}} &= \vec{g} + \nu \nabla \cdot \nabla \vec{u}
+  \frac{\partial u}{\partial t} + \vec{u} \cdot \nabla{\vec{u}} + \frac{1}{\rho} \nabla{\vec{p}} = \vec{g} + \nu \nabla \cdot \nabla \vec{u}
 \end{equation}
 
 \begin{equation}
@@ -79,11 +80,11 @@ Splitting 방법은 $\dot q^a = f(q^a)$를 forward Euler 방법으로 먼저 푼
   \vec{u}^{n+1} &= project(\vec{u}^B)
 \end{align}
 
-참고로 Incompressibility Condition ($\nabla \cdot \vec{u} = 0$)을 만족하는 조건은 \texttt{project()} 함수에서 다루는데, 이것에 대해서는 \textbf{Pressure Solve} 섹션에서 다룰 것이다.
+참고로 Incompressibility Condition ($\nabla \cdot \vec{u} = 0$)을 만족하게끔 하는 작업은 \texttt{project()} 함수에서 진행되는데, 이것에 대해서는 \textbf{Pressure Solve} 섹션에서 다룰 것이다.
 
 \subsection{MAC Grid}
 
-전 섹션에선는 시간을 연속에서 불연속적으로 변환했으므로, 여기서는 공간을 불연속적으로 변환하는 방법에 대해 설명할 것이다. 위치 공간 ($\textbb{R}^3$)를 MAC Grid를 통해 불연속하게 쪼갤 것이다.
+전 섹션에선는 시간을 연속에서 불연속적으로 변환했으므로, 여기서는 공간을 불연속적으로 변환하는 방법에 대해 설명할 것이다. 위치 공간 ($\mathbb{R}^3$)를 MAC Grid를 통해 불연속하게 쪼갤 것이다.
 
 시뮬레이션을 수행하는 영역을 $(i, j) \in [0, M \Delta x] \times [0, N \Delta x]$이라고 하자. 일반적인 2D Grid로 이 영역의 velocity field를 표현한다면, $i = 0..(M-1)$, $j = 0..(N-1)$에 대하여,  $(i \Delta x, j \Delta x)$의 위치마다 x축의 속도 $u(i, j)$, y축의 속도 $v(i, j)$를 저장하면 된다. 즉 크기 $(M, N)$의 2차원 어레이 2개를 저장하고 있으면 될 것이다. MAC Grid는 여기서 약간의 변형을 가하는데, 위치 $((i-1/2) \Delta x, j \Delta x)$ 마다 속도 $u(i-1/2, j)$, , 위치 $(i \Delta x, (j-1/2) \Delta x)$마다 속도 $v(i,j-1/2)$가 서로 Staggered된 형태로 아래의 그림과 같이 배치가 된다.
 
@@ -111,11 +112,11 @@ Splitting 방법은 $\dot q^a = f(q^a)$를 forward Euler 방법으로 먼저 푼
 
 Advection과 Pressure Solve의 구현에 대해 알아보기 전에 일단 Semi-Lagrangian과 PIC Method의 차이점에 대해 알아보자.
 
-만약에 Lagrangian 관점으로 Advection을 바라보면, i번째 particle의 현재 속력이 $\vec{v_i}$일때 위치 $\vec{x_i}$를 매 프레임마다 $\vec{x_i}(t + \Delta t) = \vec{x_i}(t) + \vec{v_i} \Delta t$로 integration을 해 주면 되므로 매우 간단하다. 하지만 현재로서는 속력에 대한 정보가 Grid에만 존재하므로 particle의 속력을 다른 방법을 사용해서 유추해야 한다. 그런데 시간 $t + \Delta t$에 어떠한 particle이 위치 $\vec{x}$를 지나갔다면, 그 particle은 시간 $t - \Delta t$에 위치 $\vec{x} - \vec{v} \Delta t$에 있었을 것이다. 즉 $\Delta t$의 시간 뒤 위치 $\vec{x}$에서 속도는 위치 $\vec{x} - \vec{v} \Delta t$에서의 속도값으로 근사할 수 있다. (실제 프로그램의 구현에서는 $\vec{x} - \Delta t$와 같은 Forward-Euler가 아니라 3차 Runge-Kutta Method를 사용한다.)
+만약에 Lagrangian 관점으로 Advection을 바라보면, i번째 particle의 현재 속력이 $\vec{v_i}$일때 위치 $\vec{x_i}$를 매 프레임마다 $\vec{x_i}(t + \Delta t) = \vec{x_i}(t) + \vec{v_i} \Delta t$로 integration을 해 주면 되므로 매우 간단하다. 하지만 현재로서는 속력에 대한 정보가 Grid에만 존재하므로 particle의 속력을 다른 방법을 사용해서 유추해야 한다. 그런데 시간 $t + \Delta t$에 어떠한 particle이 위치 $\vec{x}$를 지나갔다면, 그 particle은 시간 $t - \Delta t$에 위치 $\vec{x} - \vec{v} \Delta t$에 있었을 것이다. 즉 $\Delta t$의 시간 뒤 위치 $\vec{x}$에서 속도는 위치 $\vec{x} - \vec{v} \Delta t$에서의 속도값으로 근사할 수 있다. (실제 프로그램의 구현에서는 $\vec{x} - \vec{v} \Delta t$와 같은 Forward-Euler가 아니라 3rd order Runge-Kutta Method를 사용한다.)
 
 Semi-Lagrangian 방법에서 Advection - Gravity - Pressure Solve 과정이 모두 끝난 후에는, Grid의 각 셀 값들을 유체인지, 혹은 빈 공간인지 업데이트해야 한다. 이것을 여러가지 방법으로 수행할 수 있는데, 가장 간단한 방법은 현재 유체인 셀들이 일정한 밀도로 marker particle들을 생성하고, 이 particle를 Pressure Solve에서 구한 velocity field를 사용해서 한 timestep동안 advection을 수행한 다음, particle들이 차지하는 셀들을 유체 셀로 바꾸는 것이다. 더욱 정확한 방법으로는 현재 유체의 영역을 나타내는 Level Set 자체에 advection을 수행하는 것이다. 
 
-PIC Method는 marker particle에 착안해서, 원래의 Advection Step을 grid 연산 대신 particle 연산으로 대체한다. 즉 Advection Step에 particle들을 이동시킨 다음, (TODO)
+PIC Method는 marker particle에 착안해서, 원래의 Advection Step을 grid 연산 대신 particle 연산으로 대체한다. 
 
 \subsection{Advection}
 
@@ -125,13 +126,15 @@ PIC Method는 marker particle에 착안해서, 원래의 Advection Step을 grid 
 
 여기서 현재 유체의 상황을 반영하여 boundary condition을 주어야 하는데, 첫 번째는 비어있는 셀들에는 압력값이 0이라는 Dirichlet boundary condition이다 (특정 영역에 대해 가해지는 제한조건). 두 번째는 유체가 고체 벽을 통과하지 못한다는 것을 나타내는 Neumann boundary condition이다 (특정 면에 대해 가해지는 제한조건).
 
-마지막 스텝인 Projection 스텝을 수행하기 위해서는 MICCG (Modified Incomplete Cholesky Conjugate Gradient) 방법을 사용한다. 이것은 선형 시스템을 푸는 대표적인 방법 중 하나인 Conjugate Gradient를 좀 더 빠르게 만든 것으로, Bridson의 책 \cite[p.79]{fluid-sim-cg}에 잘 설명되어 있다.
+마지막 스텝인 Projection 스텝을 수행하기 위해서는 MICCG (Modified Incomplete Cholesky Conjugate Gradient) 방법을 사용한다. 이것은 선형 시스템을 푸는 대표적인 방법 중 하나인 Conjugate Gradient에 근사를 가해 좀 더 빠르게 만든 것으로, Bridson의 책 \cite[p.79]{fluid-sim-cg}에 잘 설명되어 있다.
 
 \subsection{Level Set Method}
 
-Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나가 어떤 위치에 유체 안쪽 혹은 바깥쪽에 있는지를 판별하는 것이다. 가장 간단하게 이것을 해결하는 방법은 파티클이 걸쳐있는 셀들을 모두 유체로 마킹하고 그렇지 않은 것은 빈 공간으로 마킹하는 것이다. 하지만 이 방법은 파티클들의 수가 많지 않을 때 생기는 유체 내의 작은 기포 (빈 공간)를 매꾸지 못하여 유체의 내부에서 원하지 않는 유속이 생긴다는 문제가 있다. (이것에 대해서는 \textbf{Result} 섹션에서도 언급할 것이다.) 
+Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나가 어떤 위치에 유체 안쪽 혹은 바깥쪽에 있는지를 판별하는 것이다. 가장 간단하게 이것을 해결하는 방법은 파티클이 걸쳐있는 셀들을 모두 유체로 마킹하고 그렇지 않은 것은 빈 공간으로 마킹하는 것이다. 하지만 이 방법은 파티클들의 수가 많지 않을 때 생기는 유체 내의 작은 기포 (빈 공간)를 매꾸지 못하여 유체의 내부에서 원하지 않는 유속이 생긴다는 문제가 있다.
 
-그래서 우리는 Level Set Method를 통해 signed distance function을 구하는 방법을 사용할 것이다. Signed distance function은 특정 지점에서 가장 가까운 유체 파티클까지의 거리를 나타낸다 (이름에 signed가 붙은 이유는 유체 내부에서는 음수가 되기 때문이다). 만약 이 함수를 구할 수 있다면, 특정 위치가 유체 내부에 있는지 쉽게 판별할 수 있을 것이다. Level Set Method은 Grid로 Sampling하는 방식을 통해 (TODO)
+그래서 우리는 Level Set Method를 통해 signed distance function을 구하는 방법을 사용할 것이다. Signed distance function은 특정 지점에서 가장 가까운 유체 파티클까지의 거리를 나태낸다. (이름에 signed가 붙은 이유는 유체 내부에서는 음수가 되기 때문이다). 이 함수를 $\psi: \mathbb{R}^3 \rightarrow \mathbb{R}$이라고 하면, Eikonal equation ($|\nabla \phi| = 1$)를 만족하게 된다. 프로그램에서는 Fast Sweeping Method\cite{fast-sweeping}을 사용하여 Eikonal equation의 해를 찾아내고 난 뒤, 이 함수를 사용하여 특정 지점엣 위치가 음수인지 양수인지를 판별하여 유체의 안과 바깥을 구분한다.
+
+프로그램에서 Level Set Method는 유체의 안과 바깥을 구분하는 것 이외에 다른 용도로도 쓰인다. 
 
 \subsection{Implementation Details}
 
@@ -146,13 +149,13 @@ Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나가 어�
 
 시뮬레이션의 성능을 높이기 위해서 여러가지 방법을 사용했는데, 일부 연산을 가속화시키기 위해 AVX/FMA SIMD intrinsics를 사용했다. (이것의 사용 유무를 CMake 빌드 세팅에서 \texttt{USE\_SIMD} 옵션으로 제어할 수 있다.) 예를 들어서, 연산에 많이 사용되는 함수 중 하나인 bicubic linear interpolation 함수, 그리고 pressure solve에서 자주 사용되는 벡터 간의 multiply-add 연산이 최적화 대상 중에 있었다.  그리고 OpenMP를 사용하여 유체 시뮬레이션 코드 중 병렬화가 편이한 부분 (loop index 사이에 dependency가 없는 for loop)을 여러 쓰레드에서 돌릴 수 있도록 했다.
 
-사용자는 UI를 통해 중력값을 바꿀 수 있고, 시뮬레이션에 관련된 중요한 값들 (현재 시간, 평균 압력, 평균 속도, CFL) 등을 볼 수 있다. 그리고 좌클릭 드래그를 통해 유체의 한 지점의 속도를 바꿀 수 있고, 우클릭 드래그를 통해 시뮬레이션 전체의 중력을 바꿀 수 있다.
+사용자는 UI를 통해 중력의 크기 (x축과 y축)를 바꿀 수 있고, 시뮬레이션에 관련된 중요한 값들 (현재 시간, 평균 압력, 평균 속도, CFL) 등을 볼 수 있다. 그리고 좌클릭 드래그를 통해 유체의 한 지점의 속도를 바꿀 수 있고, 우클릭 드래그를 통해 시뮬레이션 전체의 중력을 바꿀 수 있다.
 
 \section{Results}
 
 3가지의 초기 상태 (물 particle의 초기 위치) 에 대해서 시뮬레이션을 수행해 보있다.
 
-\begin{enumerate}
+\begin{enumerate}[label=\Alph*.]
   \item 모자 모양으로 되어 있는 배열 형태.
   \item 물 전체가 한쪽으로 기울어져 있는 형태.
   \item 정육면체의 모양의 물 영역이 떨어지는 형태.
@@ -164,6 +167,7 @@ Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나가 어�
 \includegraphics[width=0.32\textwidth]{init_state_1}
 \includegraphics[width=0.32\textwidth]{init_state_2}
 \includegraphics[width=0.32\textwidth]{init_state_3}
+  \caption{3가지의 초기 상태를 나타낸 사진.}
 \end{figure}
 
 물의 움직임에 대한 동영상은 따로 링크로 첨부한다. (링크)
@@ -176,6 +180,16 @@ PIC 방법이 Semi-Lagrangian 방법에 비해 좀 더 생동감 있는 모습�
 
 (예시 스크린샷 첨부)
 
+눈으로만 보아서는 유체의 현실성을 평가하기 어렵기 때문에, 이론적으로 유체가 보존해야 하는 물리량들이 시간에 따라 어떻게 바뀌는지를 알아볼 것이다.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{picflip-volume-graph}
+  \caption{PIC Method에서 시간에 따른 부피의 변화. alpha는 PIC/FLIP 사이의 interpolation factor이다.}
+\end{figure}
+
+PIC와 FLIP의 Interpolation factor $\alpha$를 바꿔가면서 시뮬레이션을 수행하였는데, 위의 그래프는 
+
 Volume preservation이 되는지 비교 $\rightarrow$ 둘 다 시간에 따라 부피 증가
 
 (시간에 따른 부피 그래프 첨부)
@@ -186,20 +200,26 @@ Semi-Lagrangian이 좀 더 stable한 결과를 낼 수 있었다.
 
 Stability의 예시: Semi-Lagrangian과 PIC를 같은 조건 (진동하는 가속도 진폭 X$m/s^2$, 주기 Xs) 에서 돌렸을 때 Semi-Lagrangian은 계속 구동했고 PIC는 Pressure Solve에서 터짐.
  
+PIC Method 특유의 점성은 FLIP Method라는 방식으로 해결할 수 있는데\cite{flip-fluids}, FLIP는 ... (TODO)
+
 \subsection{Performance}
 
-본 성능측정은 Intel(R) Core(TM) i5-4690 CPU (Quad core, 3.50Ghz)에서 진행했으며, 처음 30초 동안 프로그램을 돌렸을 때의 한 프레임 당 유체 시뮬레이션 코드가 걸린 전체 시간의 평균을 구한 것이다.
+결과적으로는 128x128의 그리드 크기에 대해 노트북 CPU에서도 실시간으로 (30FPS 이상) 돌아가는 유체 시뮬레이션을 수행할 수 있었다. 아래는 Semi-Lagrangian과 PIC Method의 성능을 각각 다른 초기 조건 (A, B, C)에서 측정한 결과이다. 
 
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|l|l|l|}
+\begin{tabular}{|l|l|l|l|l|}
 \hline
-                & A & B & C \\ \hline
-Semi-Lagrangian &   &   &   \\ \hline
-PIC             &   &   &   \\ \hline
+                & A     & B     & C     & Average \\ \hline
+Semi-Lagrangian & 31.32 & 27.32 & 26.51 & 28.38   \\ \hline
+PIC/FLIP        & 24.57 & 20.91 & 19.09 & 21.52   \\ \hline
 \end{tabular}
-\caption{초기 상태 A, B, C에서 각각 Semi-Lagrangian과 PIC Method를 사용했을 때의 한 프레임당 시뮬레이션 연산 시간}
+  \caption{초기 상태 A, B, C에서 각각 Semi-Lagrangian과 PIC Method를 사용했을 때의 한 프레임당 시뮬레이션 연산 시간 (단위: ms)}
 \end{table}
+
+참고: 본 성능측정은 Intel(R) Core(TM) i7-6700HQ CPU (Quad core, Hyperthreading, 2.60Ghz)에서 진행했으며, 처음 30초 동안 프로그램을 돌렸을 때의 한 프레임 당 유체 시뮬레이션 코드가 걸린 전체 시간의 평균을 구한 것이다.
+
+결과적으로 Semi-Lagrangian이 PIC/FLIP보다 연산시간이 많이 걸렸는데, 이것의 이유로는 Semi-Lagrangian 방법의 Advection Step에서 3rd order Runge-Kutta를 사용했는데, 이것을 수행하려면 한 셀당 bicubic interpolation을 총 6번 수행해야 했기 때문이다. 반면에 PIC/FLIP method에서는 Runge-Kutta 대신에 grid-to-particle, particle-to-grid transfer를 수행해야 했는데, 이 때는 bilinear sampling을 사용해서 연산량이 비교적 덜 소모되었다. (수치로 확인하면 Semi-Lagrangian advection은 0.922ms, grid-to-particle와 particle-to-grid transfer는 각각 0.447ms이 걸렸다.) 이것 이외에도 PIC Method가 Semi-Lagrangian Method의 Pressure Update 이 각각 4.41ms과 3.68ms가 걸려, PIC/FLIP에서 MICCG 알고리즘이 좀 더 빨리 수렴한다는 것을 알 수 있다.
 
 \section{Discussion}
 
@@ -213,11 +233,9 @@ TODO
 
 \subsection{Further Study}
 
-현재의 유체 시뮬레이션에서 가장 시급하게 해결해야 하는 것이 있다면, Pressure Solver의 numerical stability를 개선하는 것이다. 파티클의 속도가 굉장히 높아지는 극단적인 경우에 Pressure Solver가 수렴을 하지 못해 올바른 해를 찾지 못하는 경우가 생겼으므로, 실제로 산업에서 활용할 만한 라이브러리로 만든다면 다양한 상황에 대해서도 무리 없이 돌아가도록 고쳐야 할 것이다. 이를 해결할 수 있는 방법 중 하나는 특정 파티클들의 속도가 너무 빨라지면 이것에 따라 해당되는 파티클의 timestep의 크기를 유동적으로 줄이는 것이다. \cite[p. 35]{fluid-sim-cg} 또 다른 해결 방안은 MICCG의 두 패러미터 값 $\tau$, $\sigma$를 조절해 보면서 더욱 좋은 수치를 찾는 것이다.
+현재의 유체 시뮬레이션에서 가장 시급하게 해결해야 하는 것이 있다면, Pressure Solver의 numerical stability를 개선하는 것이다. 파티클의 속도가 굉장히 높아지는 극단적인 경우에 대해 Pressure Solver가 수렴을 하지 못해 올바른 해를 찾지 못하는 경우가 관찰되었는데, 실제로 산업에서 활용할 만한 기술로 만든다면 다양한 상황에 대해서도 무리 없이 돌아가도록 고쳐야 할 것이다. 이를 해결할 수 있는 방법 중 하나는 특정 파티클들의 속도가 너무 빨라지면 해당되는 파티클의 integration을 하는 timestep의 크기를 유동적으로 줄이는 것이다. \cite[p. 35]{fluid-sim-cg} 또 다른 해결 방안은 MICCG의 두 패러미터 값 $\tau$, $\sigma$를 조절해 보면서 더욱 좋은 수치를 찾는 것이다.
 
 그리고 Semi-Lagrangian 방법에서 Particle의 밀도가 충분치 않을 때 부피가 줄어드는 현상을 관찰할 수 있었는데, 이것은 Kim et al. \cite{volume-preservation} 의 논문의 방법처럼 projection step에서 velocity field의 divergence를 0이 아닌 다른 값으로 보정해 해결할 수 있을 것이다.
-
-PIC Method 특유의 점성은 FLIP Method라는 방식으로 해결할 수 있는데\cite{flip-fluids}, FLIP는 ... (TODO)
 
 \section{Conclusion}
 
@@ -232,10 +250,15 @@ Doyub Kim.
 \textit{Fluid Engine Development}.
 A K Peters/CRC Press, 2017.
 
+\bibitem{fast-sweeping}
+Zhao, Hongkai.
+\textit{A fast sweeping method for Eikonal equations}.
+Mathematics of Computation, 74 (250): 603–627, 2005.
+
 \bibitem{flip-fluids}
 J.U.Brackbill, D.B.Kothe, H.M.Ruppel.
 \textit{FLIP: A Low-dissipation, Particle-in-cell Method for Fluid Flow}.
-Computer Physics Communications, Vol. 48, p. 25-38, 1988.
+Computer Physics Communications, 48, p. 25-38, 1988.
 
 \bibitem{volume-preservation}
 Kim, Byungmoon and Liu, Yingjie and Llamas, Ignacio and Jiao, Xiangmin and Rossignac, Jarek
