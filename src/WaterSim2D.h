@@ -91,6 +91,12 @@ struct WaterSim2D {
     double waterVolume = 0.0;
     Vec<double> waterVolumeData = {};
 
+    double totalEnergy = 0.0;
+    Vec<double> totalEnergyData = {};
+
+    double particleTotalEnergy = 0.0;
+    Vec<double> particleTotalEnergyData = {};
+
     void setup(double dt, double dx, double dr, double rho, double gravity);
 
     void free();

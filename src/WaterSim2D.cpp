@@ -43,35 +43,6 @@ void WaterSim2D::setup(double dt, double dx, double dr, double rho, double gravi
     int initState = WaterSimSettings::Dim2D::INIT_STATE;
     if (initState == 0) {
         iterate([&](size_t i, size_t j) {
-            if (i == 0 || i == SIZEX - 1 ||
-                j == 0 || j == SIZEY - 1) {
-                cell(i, j) = CellType::SOLID;
-            }
-            else if (i + j < SIZEY * 3 / 4) {
-                cell(i, j) = CellType::FLUID;
-                fluidCount++;
-            }
-            else {
-                cell(i, j) = CellType::EMPTY;
-            }
-        });
-    }
-    else if (initState == 1) {
-        iterate([&](size_t i, size_t j) {
-            if(i == 0 || i == SIZEX - 1 || j == 0 || j == SIZEX - 1) {
-                cell(i, j) = CellType::SOLID;
-            }
-            else if (i >= SIZEX/4 && i < 3*SIZEX/4 && j >= 1*SIZEY/8 && j < 5*SIZEY/8) {
-                cell(i, j) = CellType::FLUID;
-                fluidCount++;
-            }
-            else {
-                cell(i, j) = CellType::EMPTY;
-            }
-        });
-    }
-    else if (initState == 2) {
-        iterate([&](size_t i, size_t j) {
             if (i == 0 || i == SIZEX - 1 || j == 0 || j == SIZEX - 1) {
                 cell(i, j) = CellType::SOLID;
             }
@@ -92,6 +63,35 @@ void WaterSim2D::setup(double dt, double dx, double dr, double rho, double gravi
                 else {
                     cell(i, j) = CellType::EMPTY;
                 }
+            }
+        });
+    }
+    else if (initState == 1) {
+        iterate([&](size_t i, size_t j) {
+            if (i == 0 || i == SIZEX - 1 ||
+                j == 0 || j == SIZEY - 1) {
+                cell(i, j) = CellType::SOLID;
+            }
+            else if (i + j < SIZEY * 3 / 4) {
+                cell(i, j) = CellType::FLUID;
+                fluidCount++;
+            }
+            else {
+                cell(i, j) = CellType::EMPTY;
+            }
+        });
+    }
+    else if (initState == 2) {
+        iterate([&](size_t i, size_t j) {
+            if(i == 0 || i == SIZEX - 1 || j == 0 || j == SIZEX - 1) {
+                cell(i, j) = CellType::SOLID;
+            }
+            else if (i >= SIZEX/4 && i < 3*SIZEX/4 && j >= 1*SIZEY/8 && j < 5*SIZEY/8) {
+                cell(i, j) = CellType::FLUID;
+                fluidCount++;
+            }
+            else {
+                cell(i, j) = CellType::EMPTY;
             }
         });
     }
@@ -822,17 +822,30 @@ void WaterSim2D::createWaterLevelSet() {
 
 #endif
 
+    waterVolume = 0.0f;
+    totalEnergy = 0.0f;
+    particleTotalEnergy = 0.0f;
     // compute water volume
-    int fluidCount = 0;
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
             if (cell(i, j) == CellType::FLUID) {
-                fluidCount++;
+                waterVolume += dx * dx;
+                auto vel = mac.velInterp(vec2d{i*dx,j*dx});
+                totalEnergy += 0.5 * (rho * dx * dx) * vel.LengthSquared();
+                totalEnergy -= (rho * dx * dx) * (gravity.x * (i*dx) + gravity.y * (j*dx));
             }
         }
     }
-    waterVolume = fluidCount * dx * dx;
+    int particlesPerCellSqrt = WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT;
+    for (int e = 0; e < particles.size; e++) {
+        auto pos = particles[e];
+        auto vel = particleVels[e];
+        particleTotalEnergy += 0.5 * (rho * dx * dx / (particlesPerCellSqrt * particlesPerCellSqrt)) * vel.LengthSquared();
+        particleTotalEnergy -= (rho * dx * dx / (particlesPerCellSqrt * particlesPerCellSqrt)) * (gravity.x * pos.x + gravity.y * pos.y);
+    }
     waterVolumeData.push(waterVolume);
+    totalEnergyData.push(totalEnergy);
+    particleTotalEnergyData.push(particleTotalEnergy);
 }
 
 void WaterSim2D::createSolidLevelSet() {
@@ -841,11 +854,13 @@ void WaterSim2D::createSolidLevelSet() {
 
 void WaterSim2D::saveStats() {
     perfCounter.saveToFile("perf.csv");
-    File file = File::open("volume.csv", "w+").unwrap();
+    File file = File::open("conservation.csv", "w+").unwrap();
     std::string buf;
+    buf += "Total Volume, Total Energy, Total Energy (Particle) \n";
     for (int i = 0; i < waterVolumeData.size; i++) {
-        buf += std::to_string(waterVolumeData[i]);
-        buf += '\n';
+        auto str = String::fmt("%f, %f, %f\n", waterVolumeData[i], totalEnergyData[i], particleTotalEnergyData[i]);
+        buf += str.data();
+        str.free();
     }
     file.writeAll(buf.c_str());
     file.close();

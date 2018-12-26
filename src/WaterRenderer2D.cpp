@@ -293,6 +293,7 @@ void WaterRenderer2D::update() {
         auto gravity = GRAVITY_MOUSEDRAG_SCALE * (currRightMousePos - startRightMousePos);
         sim->gravity = vec2d(sim->origGravity.x + gravity.x, sim->origGravity.y + gravity.y);
     }
+
 }
 
 void WaterRenderer2D::draw() {
@@ -371,6 +372,7 @@ void WaterRenderer2D::drawUI() {
         ImGui::Text("Max velocity in fluid: %f", maxVelocity);
         double CFLnum = sim->dt * maxVelocity / sim->dx;
         ImGui::Text("CFL Number: %f", CFLnum);
+
         ImGui::Text("Original fluid volume: %f", sim->origWaterVolume);
         ImGui::Text("Current fluid volume: %f", sim->waterVolume);
         if (sim->origWaterVolume < sim->waterVolume) {
@@ -379,6 +381,9 @@ void WaterRenderer2D::drawUI() {
         else if (sim->origWaterVolume > sim->waterVolume) {
             ImGui::Text("(%f %% volume decrease) ", (sim->origWaterVolume - sim->waterVolume) / sim->origWaterVolume * 100.f);
         }
+        ImGui::Text("Total energy: %f", sim->totalEnergy);
+        ImGui::Text("Total energy (Particle): %f", sim->particleTotalEnergy);
+
         ImGui::Text("Current timestep: %f", sim->dt);
     }
     if (ImGui::CollapsingHeader("Options")) {

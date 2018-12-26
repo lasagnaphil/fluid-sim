@@ -243,6 +243,16 @@ void App::start() {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
+        // screenshot
+        static int imageNum = 0;
+        auto inputMgr = InputManager::get();
+        if (inputMgr->isKeyEntered(SDL_SCANCODE_P)) {
+            auto name = String::fmt("Screenshot %d.bmp", imageNum);
+            screenshot(name.data());
+            name.free();
+            imageNum++;
+        }
+
         SDL_GL_SwapWindow(window);
 
         /*
@@ -252,5 +262,46 @@ void App::start() {
             SDL_Delay(msPerFrame - (SDL_GetTicks() - frameTime));
         }
          */
+    }
+}
+
+void ByteSwap(uint8_t* a, uint8_t* b)
+{
+    uint8_t tmp = *b;
+    *b = *a;
+    *a = tmp;
+}
+
+void App::screenshot(const char* filename) {
+
+    // Press P for screenshot
+
+    {
+        uint8_t* pixels = new uint8_t[3 * settings.screenSize.x * settings.screenSize.y];
+        glReadPixels(0, 0, settings.screenSize.x, settings.screenSize.y, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+
+        // 1. Exchange red / blue pixel info.
+        for (int i = 0; i < settings.screenSize.x * settings.screenSize.y; i++) // Exchange red / blue mask.
+            ByteSwap(&pixels[3 * i], &pixels[3 * i + 2]);
+
+        // 2. Change top <-> down order.
+        for (int row = 0; row < settings.screenSize.y / 2; row++)
+        {
+            int oppoRow = settings.screenSize.y - 1 - row;
+
+            if (row >= oppoRow) break;
+
+            for (int col = 0; col < settings.screenSize.x; col++)
+            {
+                for(int i = 0; i < 3; i++)
+                    ByteSwap(&pixels[3 * (settings.screenSize.x * row + col) + i], &pixels[3 * (settings.screenSize.x * oppoRow + col) + i]);
+            }
+        }
+
+        SDL_Surface* surface;
+        surface = SDL_CreateRGBSurfaceFrom(pixels, settings.screenSize.x, settings.screenSize.y, 24, 3 * settings.screenSize.x, 0, 0, 0, 0);
+        SDL_SaveBMP(surface, filename);
+        SDL_FreeSurface(surface);
+        delete[] pixels;
     }
 }

@@ -28,6 +28,7 @@ struct App {
     void init(mathfu::vec2i screenSize, Mode mode);
     void free();
     void start();
+    void screenshot(const char* filename);
 
     SDL_Window* window;
     SDL_GLContext glContext;

@@ -24,11 +24,11 @@ struct WaterSimSettings {
         static constexpr double DR = DX * 0.9;
         static constexpr int PARTICLES_PER_CELL_SQRT = 2;
         static constexpr SimMode SIM_MODE = SimMode::PIC;
-        static constexpr int INIT_STATE = 2;
-        static constexpr bool OSCILLATE_GRAVITY = true;
+        static constexpr int INIT_STATE = 1;
+        static constexpr bool OSCILLATE_GRAVITY = false;
         static constexpr float OSCILLATE_GRAVITY_AMP = 1.0f;
         static constexpr float OSCILLATE_GRAVITY_PERIOD = 2.0f;
-        static constexpr float PIC_FLIP_INTERP_ALPHA = 0.8;
+        static constexpr float PIC_FLIP_INTERP_ALPHA = 0.5f;
     };
 };
 
