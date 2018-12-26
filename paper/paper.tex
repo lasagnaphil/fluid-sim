@@ -280,11 +280,9 @@ Figure \ref{realism-semilag}, \ref{realism-pic}에서는 초기 상태 B에서 �
 \includegraphics[width=0.24\textwidth]{realism-pic-2}
 \includegraphics[width=0.24\textwidth]{realism-pic-3}
 \includegraphics[width=0.24\textwidth]{realism-pic-4}
-  \caption{PIC Method ($\alpha$=1.0) 예시.}
+  \caption{PIC Method 예시.}
   \label{realism-pic}
 \end{figure}
-
-PIC와 FLIP의 비중에 따라 유체의 운동이 어떻게 바뀌는지에 대해서도 조사해 보았다. (TODO)
 
 \subsection{Numerical Analysis}
 
@@ -293,7 +291,7 @@ PIC와 FLIP의 비중에 따라 유체의 운동이 어떻게 바뀌는지에 �
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.7\textwidth]{picflip-volume-graph}
-  \caption{PIC Method에서 시간에 따른 부피의 변화. $\alpha$는 PIC/FLIP 사이의 regularization factor이다. }
+  \caption{PIC Method에서 시간에 따른 부피의 변화.}
   \label{volume-increase-graph}
 \end{figure}
 
@@ -359,9 +357,7 @@ Semi-Lagrangian과 PIC에서의 총 에너지 감소가 일어나는 원인에 �
 
 현재의 프로그램에서 Semi-Lagrangian 방법과 PIC Method 모두 부피가 증가/감소하는 현상을 관찰할 수 있었다. (특히 Semi-Lagrangian 방법에서는 부피 팽창이 심한 것을 측정하였다.) 이것을 해결한다면 파티클이 부족한 셀에 새로운 파티클을 추가하고, 파티클이 너무 많은 셀에 파티클을 제거하는 reseeding stage를 추가하는 것이 효과가 있을 것이다. \cite[p. 117]{fluid-sim-cg} 물론 reseeding에서 파티클의 수는 일정하게 유지되게 해야 할 것이다. 더욱 정확한 분배를 하고 싶다면 유체의 level set을 사용하여 경계를 찾은 다음 유체의 안쪽에 파티클들을 골고루 분배할 수 있을 것이다.  혹은 Kim et al. \cite{volume-preservation} 의 논문의 방법처럼 projection step에서 velocity field의 divergence를 0이 아닌 다른 값으로 보정해 해결하는 방식도 있다. \textbf{Result} 섹션에서 언급했던 파티클이 하나의 모서리로 모이는 문제도 reseeding을 통해 해결할 수 있을 것으로 보인다.
 
-현재의 유체 시뮬레이션에서 개선할 점이 있다면, Pressure Solver의 numerical stability를 개선하는 것이다. 파티클의 속도가 굉장히 높아지는 극단적인 경우에 대해 Pressure Solver가 수렴을 하지 못해 올바른 해를 찾지 못하는 경우가 관찰되었는데, 실제로 산업에서 활용할 만한 기술로 만든다면 다양한 상황에 대해서도 무리 없이 돌아가도록 고쳐야 할 것이다. 이를 해결할 수 있는 방법 중 하나는 특정 파티클들의 속도가 너무 빨라지면 해당되는 파티클의 integration을 하는 timestep의 크기 ($\Delta t$) 를 유동적으로 줄이는 것이다. \cite[p. 35]{fluid-sim-cg} 또 다른 해결 방안은 MICCG의 두 패러미터 값 $\tau$, $\sigma$를 fine tuning해 더욱 좋은 수치를 찾는 것이다. (현재는 $\tau=0.999$, $\sigma=0.25$을 사용하고 있다.)
-
-이것 외에도 PIC와 FLIP을 더욱 개선할 수 있는 APIC (Affine Particle-in-cell) 방법이 있는데, PIC에서의 dissipation이 일어나는 현상과 FLIP의 불안정성을 동시에 해결할 수 있는 방법이다. \cite{apic}
+\textbf{Result} 섹션에서 언급한 바와 비슷하게, PIC Method에서 사용하는 interpolation은 속도값들을 smoothing하는 경향이 있어, 유체에 원하지 않는 numerical dissipation을 가져온다는 것이 알려져 있다. 그래서 PIC를 보완한 FLIP (Fluid-Implicit Particle Method)가 있는데, FLIP에서는 그리드에서 파티클로 속도값을 가져올 때 속도값을 interpolation으로 가져오는 것이 아니라 한 프레임 동안의 속도값의 변화량을 가져오는 방식을 사용한다. FLIP의 장점으로는 PIC와 같은 dissipation이 없지만, 대신 노이즈가 증가할 수 있다는 것이다. Bridson은 PIC와 FLIP을 $\alpha$만큼의 regularization factor로 섞어서 쓰는것을 권장한다 \cite[p. 118]{fluid-sim-cg}. 즉 파티클의 속도를 구하는 식은 $\vec{u}_p^{new} = \alpha \texttt{interp}(\vec{u}_{grid}^{new}, \vec{x}_p) + (1 - \alpha) \texttt{interp}(\vec{u}_{grid}^{new} - \vec{u}_{grid}, \vec{x}_p)$로 쓸 수 있다 (왼쪽 항은 PIC, 오른쪽 항은 FLIP). 이것 외에도 PIC와 FLIP을 더욱 개선할 수 있는 APIC (Affine Particle-in-cell) 방법이 있는데, PIC에서의 dissipation이 일어나는 현상과 FLIP의 불안정성을 동시에 해결할 수 있는 방법이다. \cite{apic}
 
 \section{Conclusion}
 
