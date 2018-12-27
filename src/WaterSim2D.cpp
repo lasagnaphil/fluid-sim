@@ -14,6 +14,7 @@
 
 #define USE_GHOST_PRESSURE
 #define USE_LEVEL_SET
+#define USE_RESEEDING
 
 using namespace mathfu;
 
@@ -289,7 +290,6 @@ void WaterSim2D::transferVelocityToGrid() {
     delete udiv;
     delete vdiv;
 }
-
 
 void WaterSim2D::applySemiLagrangianAdvection() {
     double C = 5;
@@ -688,7 +688,6 @@ void WaterSim2D::applyAdvection() {
         }
         pos = nextPos;
     }
-
 }
 
 
@@ -924,23 +923,27 @@ void LevelSet::redistance() {
             double phi0 = (*oldPhi)(i,j);
             double phi1 = (*oldPhi)(i+1,j);
             double phi2 = (*oldPhi)(i,j+1);
-            if (phi0 * phi1 < 0 && abs(phi0 - phi1) > dx) {
-                double theta0 = phi0 / (phi0 - phi1);
-                double theta1 = phi1 / (phi0 - phi1);
-                double newPhi0 = utils::sgn(phi0) * theta0 * dx;
-                if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
-                double newPhi1 = utils::sgn(phi1) * theta1 * dx;
-                if (abs(newPhi1) < abs(phi1)) phi(i+1,j) = phi1;
+            if (phi0 * phi1 < 0) {
+                if (abs(phi0 - phi1) > dx) {
+                    double theta0 = phi0 / (phi0 - phi1);
+                    double theta1 = phi1 / (phi0 - phi1);
+                    double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                    if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
+                    double newPhi1 = utils::sgn(phi1) * theta1 * dx;
+                    if (abs(newPhi1) < abs(phi1)) phi(i+1,j) = phi1;
+                }
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i+1,j) = true;
             }
-            if (phi0 * phi2 < 0 && abs(phi0 - phi2) > dx) {
-                double theta0 = phi0 / (phi0 - phi2);
-                double theta2 = phi2 / (phi0 - phi2);
-                double newPhi0 = utils::sgn(phi0) * theta0 * dx;
-                if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
-                double newPhi2 = utils::sgn(phi2) * theta2 * dx;
-                if (abs(newPhi2) < abs(phi2)) phi(i,j+1) = phi2;
+            if (phi0 * phi2 < 0) {
+                if (abs(phi0 - phi2) > dx) {
+                    double theta0 = phi0 / (phi0 - phi2);
+                    double theta2 = phi2 / (phi0 - phi2);
+                    double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                    if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
+                    double newPhi2 = utils::sgn(phi2) * theta2 * dx;
+                    if (abs(newPhi2) < abs(phi2)) phi(i,j+1) = phi2;
+                }
                 (*isSurface)(i,j) = true;
                 (*isSurface)(i,j+1) = true;
             }

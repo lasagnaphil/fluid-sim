@@ -351,7 +351,7 @@ void WaterRenderer2D::drawUI() {
         float gravity[2];
         gravity[0] = (float)sim->gravity.x;
         gravity[1] = (float)sim->gravity.y;
-        ImGui::SliderFloat2("Gravity", gravity, -15.0f, 15.0f);
+        ImGui::SliderFloat2("Gravity", gravity, -30.0f, 30.0f);
         sim->gravity.x = gravity[0];
         sim->gravity.y = gravity[1];
 
