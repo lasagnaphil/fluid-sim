@@ -364,7 +364,7 @@ Figure \ref{energy-graph}를 다시 보면 처음에만 에너지가 급격하�
 
 \section{Conclusion}
 
-우리는 그리드 기반 2D 유체 애니메이션을 두 가지 접근법 (Semi-Lagrangian, Particle-in-cell)을 사용하여 제작할 수 있었고, 이를 실시간으로 돌릴 수 있었다. 결과적으로 Semi-Lagrangian 방법은 잔잔한 유체의 모습을, 그리고 PIC 방법은 역동적인 유체의 모습을 재현할 수 있었다. 그리고 Semi-Lagrangian 방법에서는 시간에 따라 총 에너지가 점점 증가했지만, PIC 방법에서는 오히려 서서히 감소했다. 현재 구현체는 Semi-Lagrangian/PIC 모두 Volume preservation을 만족하지 못하는 문제가 있지만, 이를 particle reseeding 등의 방법을 통해 해결할 수 있을 것이다.
+우리는 그리드 기반 2D 유체 애니메이션을 두 가지 접근법 (Semi-Lagrangian, Particle-in-cell)을 사용하여 제작할 수 있었고, 이를 실시간으로 돌릴 수 있었다. 결과적으로 Semi-Lagrangian 방법은 잔잔한 유체의 모습을, 그리고 PIC 방법은 역동적인 유체의 모습을 재현할 수 있었다. 그리고 Semi-Lagrangian 방법에서는 시간에 따라 총 에너지가 점점 증가했지만, PIC 방법에서는 오히려 서서히 감소했다. 현재 구현체는 volume preservation을 만족하지 못하는 문제가 있지만, 이를 particle reseeding 등의 방법을 통해 해결할 수 있을 것이다.
 
 \newpage 
 
