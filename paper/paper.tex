@@ -1,4 +1,4 @@
-\documentclass[11pt, A4]{article}
+\documentclass[12pt, A4]{article}
 \usepackage[T1]{fontenc}
 \usepackage{CJKutf8}
 \usepackage[english]{babel}
@@ -34,11 +34,15 @@
 
 \section{Introduction}
 
-컴퓨터 그래픽스에서의 유체 시뮬레이션은 크게 두 접근방법으로 나뉘는데, 유체를 파티클의 집합으로 보아 각 파티클의 위치를 직접 시뮬레이션하는 Lagrangian 접근법, 그리고 유체를 유속의 vector field로 보아 파티클들이J 주어진 위치에서 유체가 지나가는 속도를 시뮬레이션하는 Eulerian Simulation이 있다. Semi-Lagrangian Method와 PIC Method 모두 양쪽 접근법을 같이 쓰는데, 이 연구에서는 이 둘을 구현한 다음에 서로 비교하여 장단점에 대해 알아볼 것이다.
+컴퓨터의 성능이 좋아지면서 영화, 애니메이션, 게임 등의 예술 매체에서는 더욱 현실적인 그래픽을 요구하기 시작했다. 이 중에서 자연현상을 모방하기 위한 연구가 컴퓨터 그래픽스 분야에서 활발히 진행되고 있다. 대표적인 자연현상 중 하나는 해변가의 파도 혹은 폭포에서 나오는 물과 같은 유체의 흐름인데, 이것을 빠른 성능으로 자연과 비슷하게 재현하는 기술은 지금도 활발한 연구의 대상이 되고 있다.
+
+영화, 애니메이션, 게임 등에 사용되는 유체 애니메니션을 제작하는 데에는 두 가지의 관점이 존재한다. 하나는 유체를 이루는 파티클들의 위치와 속도를 추적해 나가면서 시뮬레이션을 수행하는 Lagrangian 접근법, 그리고 특정 위치에서 유체가 지나가는 속도를 추적해 나가면서 시뮬레이션을 수행하는 Eulerian 접근법이 있다. 대표적인 Lagrangian 접근법을 사용하는 유체 시뮬레이션은 SPH(Smoothed Particle Hydrodynamics)인데, 이 경우에는 유체를 질점의 집합으로 취급하고, 각 질점의 위치와 속도를 매 프레임마다 계산한다. 반대로 Eulerian 접근법에서는 임의의 위치에 대해 유체가 지나가는 속도 $\vec{u}(\vec{x}): \mathbb{R}^3 \rightarrow \mathbb{R}^3$, 즉 벡터장을 다루게 된다. 벡터장은 Navier-Stokes Equation이라고 하는 공식을 따르는데, 아쉽게도 이것의 analytic한 솔루션은 발견이 되지 않았으므로, 보통 벡터장을 그리드를 통해 불연속적으로 근사하여 구하게 된다. 
+
+본 논문에서는 Eulerian 관점으로 접근해 그리드를 사용한 2D 유체 시뮬레이션을 구현할 것이다. 시뮬레이션하는 유체는 점성이 없는 물과 같은 특성으로 가정한다. (표면장력은 여기서 고려하지 않는다.) Semi-Lagrangian 방법과 PIC (Particle-in-cell) 방법 두 가지를 구현해 볼 것인데, 이 두 가지 방법은 본질적으로는 Eulerian 방법이긴 하지만 Lagrangian 접근법의 일부를 가져와 사용한다. 이 논문에서는 이 방법들을 구현하는 과정에 대해 설명하고, 시뮬레이션 결과를 분석하여 이들이 가지는 차이점과 장단점에 대해 조사해 볼 것이다.
 
 \section{Methods}
 
-본 섹션에서는 프로그램의 구현 방법에 대해서 설명할 것이다.
+본 섹션에서는 프로그램의 구현 방법과 원리에 대해서 설명할 것이다.
 
 \subsection{Navier-Stokes Equation}
 
@@ -119,23 +123,21 @@ Semi-Lagrangian 방법에서 Advection - Gravity - Pressure Solve 과정이 모�
 
 Semi-Lagrangian에서는 실질적으로 Advection을 그리드에서 한번, 파티클에서 한번 실행해야 한다는 단점이 있다. PIC (Particle-in-cell) Method는 이 두 가지 Advection을 하나로 통일화하는데, 시뮬레이션에서 파티클들의 위치와 속도 정보를 저장하여, advection step에서 파티클들을 직접 움직이는 방법이다. 이 방법의 문제는 Advection 후에 Gravity/Pressure Solve 를 적용하려면 넘어갈려면 파티클의 속도값을 그리드로, 반대로 Gravity/Pressure Solve 후에 Advection을 적용하려면 그리드의 속도값을 파티클로 옮기는 작업이 필요하다. PIC는 interpolation을 사용해 Eulerian 관점과 Lagrangian 관점의 속도값을 서로 변환하게 된다. 
 
-PIC Method에서 사용하는 interpolation은 속도값들을 smoothing하는 경향이 있어, 유체에 원하지 않는 numerical dissipation을 가져오는 경향이 있다. 그래서 PIC에서 조금 수정을 가한 FLIP Method도 같이 구현했는데, FLIP에서는 그리드에서 파티클로 속도값을 가져올 때 속도값을 interpolation으로 가져오는 것이 아니라 한 프레임 동안의 속도값의 변화량을 가져오는 방식을 사용한다. FLIP의 장점으로는 PIC와 같은 dissipation이 없지만, 대신 노이즈가 증가할 수 있다는 것이다. Bridson은 PIC와 FLIP을 $\alpha$만큼의 regularization factor로 섞어서 쓰는것을 권장한다 \cite[p. 118]{fluid-sim-cg}. 즉 파티클의 속도를 구하는 식은 $\vec{u}_p^{new} = \alpha \texttt{interp}(\vec{u}_{grid}^{new}, \vec{x}_p) + (1 - \alpha) \texttt{interp}(\vec{u}_{grid}^{new} - \vec{u}_{grid}, \vec{x}_p)$로 쓸 수 있다 (왼쪽 항은 PIC, 오른쪽 항은 FLIP). 최종 프로그램에서는 서로 다른 $\alpha$값을 가지고 실험해 볼 수 있는데, $\alpha$값에 따른 유체 시뮬레이션의 변화에 대해서는 \textbf{Results} 섹션에서 다룰 것이다.
-
 \subsection{Pressure Solve}
 
-\textbf{MAC Grid} 섹션에서의 공식들을 사용해 (2)의 incompressibility 조건과 (5)의 Pressure solve 공식을 불연속적인 버젼으로 옮길 수 있다. 식을 정리하면 다음과 같이 나온다:
+\textbf{MAC Grid} 섹션에서의 공식들을 사용해 (2)의 incompressibility 조건과 (5)의 Pressure solve 공식을 불연속적인 버젼으로 옮길 수 있다. 이 두 식을 결합해 정리하면 다음과 같은 식을 얻을 수 있다:
 
 \begin{equation}
   \frac{\Delta t}{\rho} (\frac{4p_{i,j} - p_{i+1,j} - p_{i-1,j} - p_{i,j+1} - p_{i,j-1}}{\Delta x^2}) = -\frac{u_{i+1/2,j} - u_{i-1/2,j} + u_{i,j+1/2} - u_{i,j-1/2}}{\Delta x}
 \end{equation}
 
-이젠 이 식을 $Ap = b$꼴의 linear system으로 변환할 수 있다. 다만 조심해야 할 것은 현재 유체의 상황을 반영하여 경계조건을 주어야 하는데, 첫 번째는 비어있는 셀들에는 압력값이 0 ($p = 0$)이라는 Dirichlet 경계조건이다. 두 번째는 유체가 고체 벽을 통과하지 못한다는 것($\Delta t / \rho \cdot \partial_x p = u - u^{solid}$)을 나타내는 Neumann 경계조건이다. \cite[p. 69-70]{fluid-sim-cg} 이 제한조건들을 적용함으로 인해 행렬 $A$가 바뀌게 된다.
+이젠 이 식을 $Ap = b$꼴의 linear system으로 변환할 수 있다 (식의 모양 때문에 행렬 $A$는 대칭행렬이 된다). 다만 조심해야 할 것은 유체의 현실적 상황을 반영하여 경계조건을 주어야 하는데, 첫 번째는 비어있는 셀들에는 압력값이 0 ($p = 0$)이라는 Dirichlet 경계조건이다. 두 번째는 유체가 고체 벽을 통과하지 못한다는 것($\Delta t / \rho \cdot \nabla p = \vec{u} - \vec{u}^{solid}$)을 나타내는 Neumann 경계조건이다 \cite[p. 69-70]{fluid-sim-cg} (다만 구현하는 프로그램에서는 고체 벽이 고정되있다고 가정할 것이며, 즉 $u^{solid} = 0$이다). 이 제한조건들을 적용함으로 인해 행렬 $A$가 바뀌게 된다.
 
 이젠 linear system $Ap = b$를 풀기 위해서는 MICCG (Modified Incomplete Cholesky Conjugate Gradient) 방법을 사용한다. 이것은 선형 시스템을 푸는 대표적인 방법 중 하나인 Conjugate Gradient에 근사를 가해 좀 더 빠르게 만든 것으로, Bridson의 책 \cite[p.79]{fluid-sim-cg}에 잘 설명되어 있다.
 
 \subsection{Level Set Method}
 
-Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나가 어떤 위치에 유체 안쪽 혹은 바깥쪽에 있는지를 판별하는 것이다. 가장 간단하게 이것을 해결하는 방법은 파티클이 걸쳐있는 셀들을 모두 유체로 마킹하고 그렇지 않은 것은 빈 공간으로 마킹하는 것이다. 하지만 이 방법을 사용했을 때에는 파티클들의 수가 많지 않을 때 생기는 유체 내의 작은 기포 (빈 공간)를 매꾸지 못하여 유체의 내부에서 원하지 않는 유속이 생긴다는 문제를 발견하였다.
+Pressure Solve 과정을 수행하는 데 중요한 부분 중에 하나는, 특정 위치가 유체 안쪽 혹은 바깥쪽에 있는지를 판별하는 것이다. 가장 간단하게 이것을 해결하는 방법은 파티클이 걸쳐있는 셀들을 모두 유체로 마킹하고 그렇지 않은 것은 빈 공간으로 마킹하는 것이다. 하지만 이 방법을 사용했을 때에는 파티클들의 수가 많지 않을 때 생기는 유체 내의 작은 기포 (빈 공간)를 매꾸지 못하여, 유체의 내부에서 원하지 않는 유속이 생긴다는 문제가 있다.
 
 그래서 최종 프로그램에서는 Level Set Method를 통해 signed distance function을 구하는 방법을 사용할 것이다. Signed distance function은 특정 지점에서 가장 가까운 유체 파티클까지의 거리를 나태낸다. (이름에 signed가 붙은 이유는 유체 내부에서는 음수가 되기 때문이다). 이 함수를 $\phi: \mathbb{R}^3 \rightarrow \mathbb{R}$이라고 하면, Eikonal equation ($|\nabla \phi| = 1$)를 만족하게 된다. 프로그램에서는 Closest Point Method \cite[p. 11]{dist-function}로 유체 바깥과 경계의 $\phi$값들을 구한 다음, Fast Sweeping Method\cite{fast-sweeping}을 사용하여 유체 안쪽의 $\phi$값들도 구하게 된다. (자세한 방법은 \cite[p.49-p.56, p.126]{fluid-sim-cg} 참조.) Eikonal equation의 해 $\phi$를 찾아내고 나면, 특정 지점에서 $\phi$값이 음수인지 양수인지를 판별하여 유체의 안과 바깥을 구분한다.
 
@@ -173,15 +175,15 @@ loop:
   \item MathFu (수학 라이브러리)
 \end{itemize}
 
-시뮬레이션의 성능을 높이기 위해서 여러가지 방법을 사용했는데, 일부 연산을 가속화시키기 위해 AVX/FMA SIMD intrinsics를 사용했다. (이것의 사용 유무를 CMake 빌드 세팅에서 \texttt{USE\_SIMD} 옵션으로 제어할 수 있다.) 예를 들어서, 연산에 많이 사용되는 함수 중 하나인 bicubic linear interpolation 함수, 그리고 pressure solve에서 자주 사용되는 벡터 간의 multiply-add 연산이 최적화 대상 중에 있었다.  그리고 OpenMP를 사용하여 유체 시뮬레이션 코드 중 병렬화가 편이한 부분 (loop index 사이에 dependency가 없는 for loop)을 여러 쓰레드에서 돌릴 수 있도록 했다.
+시뮬레이션의 성능을 높이기 위해서 여러가지 방법을 사용했는데, 일부 연산을 가속화시키기 위해 AVX/FMA SIMD intrinsics를 사용했다. (이것의 사용 유무를 CMake 빌드 세팅에서 \texttt{USE\_SIMD} 옵션으로 제어할 수 있다.) 예를 들어서, Semi-Lagrangian advection 연산에 많이 사용되는 함수인 bicubic linear interpolation 함수, 그리고 pressure solve에서 자주 사용되는 벡터 간의 multiply-add 연산이 최적화 대상이였다.  그리고 OpenMP를 사용하여 유체 시뮬레이션 코드 중 병렬화가 편이한 부분 (loop index 사이에 dependency가 없는 for loop)을 여러 쓰레드에서 돌릴 수 있도록 했다.
 
-사용자는 UI를 통해 중력의 크기 (x축과 y축)과 $\alpha$값 (PIC/FLIP의 regularization factor)를 바꿀 수 있고, 시뮬레이션에 관련된 중요한 값들 (현재 시간, 평균 압력, 평균 속도) 등을 볼 수 있다. 그리고 좌클릭 드래그를 통해 유체의 한 지점의 속도를 바꿀 수 있고, 우클릭 드래그를 통해 시뮬레이션 전체의 중력을 바꿀 수 있다.
+사용자는 UI를 통해 중력의 크기 (x축과 y축)를 바꿀 수 있고, 시뮬레이션에 관련된 중요한 값들 (현재 시간, 평균 압력, 평균 속도) 등을 볼 수 있다. 그리고 좌클릭 드래그를 통해 유체의 한 지점의 속도를 바꿀 수 있고, 우클릭 드래그를 통해 시뮬레이션 전체의 중력을 바꿀 수 있다.
 
 또한 사용자는 현재 유체에 해당되는 셀의 위치 뿐만 아니라, 사용하고 있는 파티클의 위치와 속도 벡터를 볼 수 있다. 해당하는 옵션을 클릭하면 각 셀의 압력의 크기, 그리고 level set의 모습도 볼 수 있다.
 
 \section{Results}
 
-3가지의 초기 상태 (물 particle의 초기 위치) 에 대해서 시뮬레이션을 수행해 보았다.$\Delta t$ = 0.033s, $\Delta x = 0.02m$, 그리드 크기=128x128, 셀 당 입자 개수 4개, 중력 9.81$m/s^2$으로 고정하고 다음 실험들을 진행하였다. 초기 상태는 다음과 같이 세 종류를 주었다:
+3가지의 초기 상태 (물 particle의 초기 위치) 에 대해서 시뮬레이션을 수행해 보았다.$\Delta t = 0.033s$, $\Delta x = 0.02m$, 그리드 크기는 128x128, 셀 당 입자 개수 4개, 중력 $g=9.81m/s^2$으로 고정하고 다음 실험들을 진행하였다. 초기 상태는 다음과 같이 세 종류를 주었다:
 
 \begin{enumerate}[label=\Alph*.]
   \item 모자 모양으로 되어 있는 배열 형태.
@@ -189,7 +191,7 @@ loop:
   \item 정육면체의 모양의 물 영역이 떨어지는 형태.
 \end{enumerate}
 
-각각의 초기 상태에 대한 스크린샷은 다음과 같다.
+시뮬레이션은 고정된 고체 벽으로 둘러쌓여 있어, 유체가 바깥으로 빠져나오지 못하게 되어 있다. 각각의 초기 상태에 대한 스크린샷은 Figure \ref{fluid-init-state}와 같다.
 
 \begin{figure}[h]
   \centering
@@ -202,35 +204,35 @@ loop:
 
 \subsection{Realism}
 
-일단 초기상태 A, B, C 상태에서 유체를 가만히 두었을 때 Semi-Lagrangian (위)와 PIC (아래) 유체의 변화를 보았다. (\Delta t = 0.033s, \Delta x = 0.02m)
+일단 초기상태 A, B, C 상태에서 유체를 가만히 두었을 때 Semi-Lagrangian과 PIC 유체의 시간에 따른 변화를 보았다. (\Delta t = 0.033s, \Delta x = 0.02m)
 
 \begin{figure}[h!]
   \centering
-\includegraphics[width=0.20\textwidth]{semilag-state-a/img1}
-\includegraphics[width=0.20\textwidth]{semilag-state-a/img2}
-\includegraphics[width=0.20\textwidth]{semilag-state-a/img3}
-\includegraphics[width=0.20\textwidth]{semilag-state-a/img4}
+\includegraphics[width=0.23\textwidth]{semilag-state-a/img1}
+\includegraphics[width=0.23\textwidth]{semilag-state-a/img2}
+\includegraphics[width=0.23\textwidth]{semilag-state-a/img3}
+\includegraphics[width=0.23\textwidth]{semilag-state-a/img4}
 
-\includegraphics[width=0.20\textwidth]{pic-state-a/img1}
-\includegraphics[width=0.20\textwidth]{pic-state-a/img2}
-\includegraphics[width=0.20\textwidth]{pic-state-a/img3}
-\includegraphics[width=0.20\textwidth]{pic-state-a/img4}
-  \caption{초기상태 A에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC ($\alpha$ = 1.0)}
+\includegraphics[width=0.23\textwidth]{pic-state-a/img1}
+\includegraphics[width=0.23\textwidth]{pic-state-a/img2}
+\includegraphics[width=0.23\textwidth]{pic-state-a/img3}
+\includegraphics[width=0.23\textwidth]{pic-state-a/img4}
+  \caption{초기상태 A에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC}
   \label{fluid-a}
 \end{figure}
 
 \begin{figure}[h!]
   \centering
-\includegraphics[width=0.20\textwidth]{semilag-state-b/img1}
-\includegraphics[width=0.20\textwidth]{semilag-state-b/img2}
-\includegraphics[width=0.20\textwidth]{semilag-state-b/img3}
-\includegraphics[width=0.20\textwidth]{semilag-state-b/img4}
+\includegraphics[width=0.23\textwidth]{semilag-state-b/img1}
+\includegraphics[width=0.23\textwidth]{semilag-state-b/img2}
+\includegraphics[width=0.23\textwidth]{semilag-state-b/img3}
+\includegraphics[width=0.23\textwidth]{semilag-state-b/img4}
 
-\includegraphics[width=0.20\textwidth]{pic-state-b/img1}
-\includegraphics[width=0.20\textwidth]{pic-state-b/img2}
-\includegraphics[width=0.20\textwidth]{pic-state-b/img3}
-\includegraphics[width=0.20\textwidth]{pic-state-b/img4}
-  \caption{초기상태 B에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC ($\alpha$ = 1.0)}
+\includegraphics[width=0.23\textwidth]{pic-state-b/img1}
+\includegraphics[width=0.23\textwidth]{pic-state-b/img2}
+\includegraphics[width=0.23\textwidth]{pic-state-b/img3}
+\includegraphics[width=0.23\textwidth]{pic-state-b/img4}
+  \caption{초기상태 B에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC}
   \label{fluid-b}
 \end{figure}
 
@@ -238,16 +240,16 @@ loop:
 
 \begin{figure}[h!]
   \centering
-\includegraphics[width=0.20\textwidth]{semilag-state-c/img11}
-\includegraphics[width=0.20\textwidth]{semilag-state-c/img2}
-\includegraphics[width=0.20\textwidth]{semilag-state-c/img3}
-\includegraphics[width=0.20\textwidth]{semilag-state-c/img4}
+\includegraphics[width=0.23\textwidth]{semilag-state-c/img11}
+\includegraphics[width=0.23\textwidth]{semilag-state-c/img2}
+\includegraphics[width=0.23\textwidth]{semilag-state-c/img3}
+\includegraphics[width=0.23\textwidth]{semilag-state-c/img4}
 
-\includegraphics[width=0.20\textwidth]{pic-state-c/img1}
-\includegraphics[width=0.20\textwidth]{pic-state-c/img2}
-\includegraphics[width=0.20\textwidth]{pic-state-c/img3}
-\includegraphics[width=0.20\textwidth]{pic-state-c/img4}
-  \caption{초기상태 C에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC ($\alpha$ = 1.0)}
+\includegraphics[width=0.23\textwidth]{pic-state-c/img1}
+\includegraphics[width=0.23\textwidth]{pic-state-c/img2}
+\includegraphics[width=0.23\textwidth]{pic-state-c/img3}
+\includegraphics[width=0.23\textwidth]{pic-state-c/img4}
+  \caption{초기상태 C에서 시작했을 때. 위는 Semi-Lagrangian, 아래는 PIC}
   \label{fluid-c}
 \end{figure}
 
@@ -286,24 +288,28 @@ Figure \ref{realism-semilag}, \ref{realism-pic}에서는 초기 상태 B에서 �
 
 \subsection{Numerical Analysis}
 
-눈으로만 보아서는 유체의 현실성을 평가하기 어렵기 때문에, 이론적으로 유체가 보존해야 하는 물리량들이 시간에 따라 어떻게 바뀌는지를 알아볼 것이다. 일단 유체의 총 부피가 시간에 따라 보존되는지를 확인해 보았다. (PIC Method에서는 PIC와 FLIP의 regularization factor $\alpha$를 바꿔가면서 여러 개의 시뮬레이션을 수행하였다.)
+눈으로만 보아서는 유체의 현실성을 평가하기 어렵기 때문에, 이론적으로 유체가 보존해야 하는 물리량들이 시간에 따라 어떻게 바뀌는지를 알아볼 것이다. 일단 유체의 총 부피가 시간에 따라 보존되는지를 확인해 보았다.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\textwidth]{picflip-volume-graph}
+  \includegraphics[width=0.5\textwidth]{picflip-volume-graph}
   \caption{PIC Method에서 시간에 따른 부피의 변화.}
   \label{volume-increase-graph}
 \end{figure}
 
-Figure \ref{volume-increase-graph}의 그래프를 분석하면 대부분의 경우에 대하여 부피가 점점 증가하는 것을 알 수 있었다. (예외라면 $\alpha=0.9$일때 부피가 원래보다 감소하는 경향을 갖는다.) Semi-Lagrangian과 PIC과 비교를 해 보면, 전자가 총 부피가 더욱 많이 증가하는 것을 알 수 있었다. 그리고 $\alpha$값이 작아질수록 (즉 PIC보다 FLIP가 비중이 많아질수록) 부피가 원래보다 더욱 많이 팽창한다는 것을 알 수 있었는데, 오히려 PIC만 사용하고 FLIP를 사용하지 않았을 때 ($\alpha$ = 1.0) 부피 보존이 가장 잘 됨을 확인할 수 있다. 즉 현재로서 FLIP 방법은 부피 보존을 효과적으로 만족시키지 못한다는 것을 알 수 있었다. 
+Figure \ref{volume-increase-graph}의 그래프를 분석하면, Semi-Lagrangian 방법은 시간에 따라 부피가 점점 증가하고, PIC는 그대로 유지된다는 것을 알 수 있었다.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.4\textwidth]{picflip-energy-graph}
-  \includegraphics[width=0.52\textwidth]{picflip-particle-energy-graph}
+  \includegraphics[width=0.48\textwidth]{picflip-energy-graph}
+  \includegraphics[width=0.48\textwidth]{picflip-particle-energy-graph}
   \caption{PIC Method에서 시간에 따른 총 에너지의 변화. 왼쪽의 그래프에서는 총 에너지를 Grid의 유체 셀들의 에너지를 총합해서 계산했고, 오른쪽의 그래프에서는 유체 파티클들의 에너지를 총합해서 계산했다.}
   \label{energy-graph}
 \end{figure}
+
+Figure \ref{energy-graph}의 그래프를 분석하면 시뮬레이션의 초반부에는 어떠한 방법을 사용하든 에너지가 급격히 감소하는 것을 알 수 있다. 하지만 시간이 조금 지나면서 Semi-Lagrangian 방법에서는 총 에너지가 점점 증가하는 반면에, PIC Method의 경우에는 진동하면서 점점 감소하는 것을 볼 수 있다.
+
+\subsection{Instability}
 
 \begin{figure}[h!]
   \centering
@@ -317,13 +323,9 @@ Figure \ref{volume-increase-graph}의 그래프를 분석하면 대부분의 경
 \end{figure}
 
 
-Figure \ref{energy-graph}의 그래프를 분석하면 시뮬레이션의 초반부에는 어떠한 방법을 사용하든 에너지가 급격히 감소하는 것을 알 수 있다. 하지만 시간이 조금 지나면 PIC Method의 경우에는 진동하면서 일정한 값으로 수렴하게 된다. Semi-Lagrangian 방법의 경우에는 오랜 시간이 지나도 총 에너지가 점점 증가하는 것을 관찰할 수 있었다. 즉 에너지 보존의 관점으로 봤을 때에는 PIC Method가 훨씬 Stable한 방법이다.
+한 방향으로 매우 갑작스러운 강한 힘이 주어져 유속이 매우 빨라졌을 때, Semi-Lagrangian/PIC에 상관없이 시뮬레이션이 불안정해지면서 점점 부피가 감소하는 것을 관찰할 수 있었다. 파티클들의 수가 감소하는 것을 보아 디버거로 파티클들의 위치를 확인했더니, 여러개의 파티클들이 벽면의 모서리 한 곳에 뭉치는 것을 알 수 있었다. 예를 들어서 Figure \ref{explode}은 Semi-Lagrangian Method에서 가속도가 오른쪽 아래로 크게 주어졌을 때 일어난 현상이다. 
 
-\subsection{Instability}
-
-한 방향으로 매우 갑작스러운 강한 힘이 주어져 유속이 매우 빨라졌을 때, Semi-Lagrangian/PIC에 상관없이 시뮬레이션이 불안정해지면서 점점 부피가 감소하는 것을 관찰할 수 있었다. 파티클들의 수가 감소하는 것을 보아 디버거로 파티클들의 위치를 확인했더니, 여러개의 파티클들이 벽면의 모서리 한 곳에 뭉치는 것을 알 수 있었다.  예를 들어서 Figure 11은 Semi-Lagrangian Method에서 가속도가 오른쪽 아래로 크게 주어졌을 때 일어난 현상이다. 
-
-이러한 현상은 Semi-Lagrangian Method 에서 좀 더 심하게 보였으나, PIC Method에서도 비슷하게 재현할 수 있었다. 특히 timestep ($\Delta t$)가 높은 상황에서 이것이 일어날 가능성이 더 높았다.
+이러한 현상은 Semi-Lagrangian Method 에서 좀 더 심하게 보였으나, PIC Method에서도 비슷하게 재현할 수 있었다. 특히 timestep ($\Delta t$)가 높은 상황에서 이것이 일어날 가능성이 더 높았다. $\Delta t = 0.01$ 정도로 낮추면 이러한 문제가 덜 생겼지만, 이 정도로 작은 timestep에서는 더 이상 실시간으로 돌릴 수 없었다.
  
 \subsection{Performance}
 
@@ -333,36 +335,37 @@ Figure \ref{energy-graph}의 그래프를 분석하면 시뮬레이션의 초반
 \hline
                 & A     & B     & C     & Average \\ \hline
 Semi-Lagrangian & 31.32 & 27.32 & 26.51 & 28.38   \\ \hline
-PIC/FLIP        & 24.57 & 20.91 & 19.09 & 21.52   \\ \hline
+PIC             & 24.57 & 20.91 & 19.09 & 21.52   \\ \hline
 \end{tabular}
 \caption{초기 상태 A, B, C에서 각각 Semi-Lagrangian과 PIC Method를 사용했을 때의 한 프레임당 시뮬레이션 연산 시간 (단위는 ms. 조건: $\Delta t$ = 0.033s, $\Delta x$ = 0.02m, 그리드 크기는 128x128.)}
   \label{performance}
 \end{table}
 
-결과적으로는 128x128의 그리드 크기에 대해 노트북 CPU에서도 실시간으로 (30FPS 이상) 돌아가는 유체 시뮬레이션을 수행할 수 있었다. Table \ref{performance}은 Semi-Lagrangian과 PIC Method의 성능을 각각 다른 초기 조건 A, B, C에서 측정한 결과이다. (참고: 본 성능측정은 Intel(R) Core(TM) i7-6700HQ CPU (Quad core, Hyperthreading, 2.60Ghz)에서 진행했으며, 처음 30초 동안 프로그램을 돌렸을 때의 한 프레임 당 유체 시뮬레이션 코드가 걸린 전체 시간의 평균을 구한 것이다.)
+결과적으로는 128x128의 그리드 크기에 대해 노트북 CPU에서도 실시간으로 (30FPS 이상) 돌아가는 유체 시뮬레이션을 수행할 수 있었다. Table \ref{performance}은 Semi-Lagrangian과 PIC Method의 성능을 각각 다른 초기 조건 A, B, C에서 측정한 결과이다. (참고: 본 성능측정은 Intel(R) Core(TM) i7-6700HQ CPU (Quad core, Hyperthreading, 2.60Ghz)에서 진행했으며, 프로그램의 처음 30초 동안 한 프레임 당 유체 시뮬레이션이 걸린 시간을 측정하여 평균을 구한 것이다.)
 
-결과적으로 Semi-Lagrangian이 PIC/FLIP보다 연산시간이 많이 걸렸다. 이것의 이유로는 Semi-Lagrangian 방법의 Advection Step에서 3rd order Runge-Kutta를 사용했는데, 이것을 수행하려면 한 셀당 bicubic interpolation을 총 6번 수행해야 했기 때문이다. 반면에 PIC/FLIP method에서는 Runge-Kutta 대신에 grid-to-particle, particle-to-grid transfer를 수행해야 했는데, 이 때는 bilinear sampling을 사용해서 연산량이 비교적 덜 소모되었다. (수치로 확인하면 Semi-Lagrangian advection은 0.922ms, grid-to-particle와 particle-to-grid transfer는 각각 0.447ms이 걸렸다.) 이것 이외에도 Semi-Lagrangian와 PIC의 Pressure Update 시간이 각각 4.41ms과 3.68ms가 걸려, PIC/FLIP에서 MICCG 알고리즘이 좀 더 빨리 수렴한다는 것을 알 수 있다.
+결과적으로 Semi-Lagrangian이 PIC보다 연산시간이 많이 걸렸다. 이것의 이유로는 Semi-Lagrangian 방법의 Advection Step에서 3rd order Runge-Kutta를 사용했는데, 이것을 수행하려면 한 셀당 bicubic interpolation을 총 6번 수행해야 했기 때문이다. 반면에 PIC method에서는 Runge-Kutta 대신에 grid-to-particle, particle-to-grid transfer를 수행해야 했는데, 이 때는 bilinear sampling을 사용해서 연산량이 비교적 덜 소모되었다. (수치로 확인하면 Semi-Lagrangian advection은 0.922ms, grid-to-particle와 particle-to-grid transfer는 각각 0.447ms이 걸렸다.) 이것 이외에도 Semi-Lagrangian와 PIC의 Pressure Update 시간이 각각 4.41ms과 3.68ms가 걸려, PIC에서 MICCG 알고리즘이 좀 더 빨리 수렴한다는 것을 알 수 있다.
 
 \section{Discussion}
 
 \subsection{Explanation of Results}
 
-결과 중에서 눈여겨 볼 점은 Semi-Lagrangian이 PIC보다 부피와 에너지 보존 측면에서 안 좋았다는 것이다. 특히 Semi-Lagrangian의 부피 팽창 현상이 심한 것을 눈여겨 볼 수 있다. 이것에 대한 해석으로는, 논문의 사진으로는 잘 보이지 않지만 운동이 비교적 많이 일어나는 표면 근처의 셀들에서 파티클 밀도가 감소하는 것을 관찰할 수 있었다. 즉 표면의 활발한 파티클들이 서로 분산되면서 차지하고 있는 셀들의 밀도값이 낮아지는데, 이것이 유체 시뮬레이션의 어떠한 부분에도 보정되지 않아서 문제가 생긴 것이다. 만약에 파티클 밀도에 대한 보정을 가할 수 있다면, Semi-Lagrangian Method의 부피 팽창 문제를 해결할 수 있을 것이다. (방법은 \textbf{Further Improvements}를 참조하자.)
+결과 중에서 Semi-Lagrangian의 부피 팽창 현상이 심한 것을 특히 눈여겨 볼 수 있다. 이것에 대한 해석으로는, 논문의 사진으로는 잘 보이지 않지만, 운동이 비교적 많이 일어나는 표면 근처의 셀들에서 파티클 밀도가 감소하는 것을 관찰할 수 있었다. 즉 표면의 활발한 파티클들이 서로 분산되면서 차지하고 있는 셀들의 밀도값이 낮아지는데, 이것이 유체 시뮬레이션의 어떠한 부분에도 보정되지 않아서 문제가 생긴 것이다. 만약에 파티클 밀도에 대한 보정을 가할 수 있다면, Semi-Lagrangian Method의 부피 팽창 문제를 해결할 수 있을 것이다. (방법은 \textbf{Further Improvements}를 참조하자.)
 
-Figure \ref{energy-graph} 의 Semi-Lagrangian 방법에서 (처음의 에너지 감소를 제외하고) 총 에너지가 점점 증가하는 이유는, 현재 부피가 점점 커지고 있기 때문에 셀 단위로 에니지 계산을 수행하면 부피에 비례하여 에너지가 증가할 수 밖에 없기 때문이다.
+Figure \ref{energy-graph}를 다시 보면 처음에만 에너지가 급격하게 감소하다가 조금 뒤에는 거의 일정해지는 것을 알 수 있는데, 이것의 이유에 대해 알아보자. 대부분의 에너지 감소가 처음에 이루어지는 이유는, 시뮬레이션의 초반부에 물이 고체 벽에 높은 속도로 부딪히면서, 벽에서의 유체의 Boundary Condition을 만족시켜야 하기 때문에 벽과 수직 방향의 속도가 갑자기 0이 되기 때문이다. 즉 시뮬레이션의 초기에서는 물의 충격량을 벽이 모두 흡수하도록 되어 있기 때문에, 총 에너지가 감소할 수 밖에 없는 것이다. 즉 어느 방법을 사용하든, 고정된 벽을 가정한다면 초반에 에너지가 감소하는 것이 자연스러울 것이다.
 
-Semi-Lagrangian과 PIC에서의 총 에너지 감소가 일어나는 원인에 대해 살펴보자. 그래프를 보면 처음에만 에너지가 급격하게 감소하다가 조금 뒤에는 일정해지는 것을 알 수 있다. (PIC의 경우에는 시간이 지나면 특정한 에너지 값을 중심으로 조금씩 진동하는 것을 알 수 있다.) 대부분의 에너지 감소가 처음에 이루어지는 이유는, 시뮬레이션의 초반부에 물이 고체 벽에 높은 속도로 부딪히면서, 벽에서의 유체의 Boundary Condition을 만족시켜야 하기 때문에 벽과 수직 방향의 속도가 갑자기 0이 되기 때문이다. 즉 시뮬레이션에서는 물의 충격량을 벽이 모두 흡수하도록 되어 있기 때문에, 총 에너지가 감소할 수 밖에 없는 것이다. 초반을 제외한다면 양쪽 방법에서 에너지 보존이 어느 정도는 지켜지고 있다는 것을 그래프에서 알 수 있다.
+참고로 Figure \ref{energy-graph} 의 왼쪽 그래프의 Semi-Lagrangian 방법에서, 처음의 에너지 감소를 제외하면 에너지가 점점 증가하는데, 이 이유는 Semi-Lagrangian에서의 부피 팽창과 관련되어 있다. 현재 부피가 점점 커지고 있기 때문에 셀 단위로 에니지 계산을 수행하면 부피에 비례하여 에너지가 증가할 수 밖에 없다.
 
 \subsection{Further Improvements}
 
-현재의 프로그램에서 Semi-Lagrangian 방법과 PIC Method 모두 부피가 증가/감소하는 현상을 관찰할 수 있었다. (특히 Semi-Lagrangian 방법에서는 부피 팽창이 심한 것을 측정하였다.) 이것을 해결한다면 파티클이 부족한 셀에 새로운 파티클을 추가하고, 파티클이 너무 많은 셀에 파티클을 제거하는 reseeding stage를 추가하는 것이 효과가 있을 것이다. \cite[p. 117]{fluid-sim-cg} 물론 reseeding에서 파티클의 수는 일정하게 유지되게 해야 할 것이다. 더욱 정확한 분배를 하고 싶다면 유체의 level set을 사용하여 경계를 찾은 다음 유체의 안쪽에 파티클들을 골고루 분배할 수 있을 것이다.  혹은 Kim et al. \cite{volume-preservation} 의 논문의 방법처럼 projection step에서 velocity field의 divergence를 0이 아닌 다른 값으로 보정해 해결하는 방식도 있다. \textbf{Result} 섹션에서 언급했던 파티클이 하나의 모서리로 모이는 문제도 reseeding을 통해 해결할 수 있을 것으로 보인다.
+현재의 프로그램에서 Semi-Lagrangian 방법과 PIC Method 모두 부피가 증가/감소하는 현상을 관찰할 수 있었다. (특히 Semi-Lagrangian 방법에서는 부피 팽창이 심한 것을 측정하였다.) 이것을 해결하려면 파티클이 부족한 셀에 새로운 파티클을 추가하고, 파티클이 너무 많이 모여있는 셀에 파티클을 제거하는 reseeding 작업을 수행하는 것이 효과가 있을 것이다. \cite[p. 117]{fluid-sim-cg} 물론 reseeding에서 파티클의 수는 일정하게 유지되게 해야 할 것이다. 더욱 정확한 분배를 하고 싶다면 유체의 level set을 사용하여 경계를 찾은 다음 유체의 안쪽에 파티클들을 골고루 분배할 수 있을 것이다.  혹은 Kim et al. \cite{volume-preservation} 의 논문의 방법처럼 projection step에서 velocity field의 divergence를 0이 아닌 다른 값으로 보정해 해결하는 방식도 있다. \textbf{Result} 섹션에서 언급했던 파티클이 하나의 모서리로 모이는 문제도 reseeding을 통해 해결할 수 있을 것으로 보인다.
 
-\textbf{Result} 섹션에서 언급한 바와 비슷하게, PIC Method에서 사용하는 interpolation은 속도값들을 smoothing하는 경향이 있어, 유체에 원하지 않는 numerical dissipation을 가져온다는 것이 알려져 있다. 그래서 PIC를 보완한 FLIP (Fluid-Implicit Particle Method)가 있는데, FLIP에서는 그리드에서 파티클로 속도값을 가져올 때 속도값을 interpolation으로 가져오는 것이 아니라 한 프레임 동안의 속도값의 변화량을 가져오는 방식을 사용한다. FLIP의 장점으로는 PIC와 같은 dissipation이 없지만, 대신 노이즈가 증가할 수 있다는 것이다. Bridson은 PIC와 FLIP을 $\alpha$만큼의 regularization factor로 섞어서 쓰는것을 권장한다 \cite[p. 118]{fluid-sim-cg}. 즉 파티클의 속도를 구하는 식은 $\vec{u}_p^{new} = \alpha \texttt{interp}(\vec{u}_{grid}^{new}, \vec{x}_p) + (1 - \alpha) \texttt{interp}(\vec{u}_{grid}^{new} - \vec{u}_{grid}, \vec{x}_p)$로 쓸 수 있다 (왼쪽 항은 PIC, 오른쪽 항은 FLIP). 이것 외에도 PIC와 FLIP을 더욱 개선할 수 있는 APIC (Affine Particle-in-cell) 방법이 있는데, PIC에서의 dissipation이 일어나는 현상과 FLIP의 불안정성을 동시에 해결할 수 있는 방법이다. \cite{apic}
+\textbf{Result} 섹션에서 PIC를 사용할 때 총 에너지가 서서히 감소함을 보였다. 실제로 PIC Method에서 사용하는 interpolation은 속도값들을 smoothing하는 경향이 있어, 유체에 원하지 않는 numerical dissipation을 가져온다는 것이 알려져 있다. 그래서 PIC를 보완한 FLIP (Fluid-Implicit Particle Method)가 있는데, FLIP에서는 그리드에서 파티클로 속도값을 가져올 때 속도값 자체를 interpolation으로 가져오는 것이 아니라 한 프레임 동안의 속도값의 변화량을 interpolation으로 가져오는 방식을 사용한다. FLIP의 장점으로는 PIC와 같은 dissipation이 없지만, 대신 노이즈가 증가해 instability를 가져올 수 있다는 단점을 가지고 있다. Bridson은 PIC와 FLIP을 $\alpha$만큼의 regularization factor로 섞어서 쓰는것을 권장한다 \cite[p. 118]{fluid-sim-cg}. 즉 파티클의 속도를 구하는 식은 $\vec{u}_p^{new} = \alpha \texttt{interp}(\vec{u}_{grid}^{new}, \vec{x}_p) + (1 - \alpha) \texttt{interp}(\vec{u}_{grid}^{new} - \vec{u}_{grid}, \vec{x}_p)$로 쓸 수 있다 (왼쪽 항은 PIC, 오른쪽 항은 FLIP). 이것 외에도 PIC와 FLIP을 더욱 개선할 수 있는 APIC (Affine Particle-in-cell) 방법이 있는데, PIC에서의 dissipation이 일어나는 현상과 FLIP의 불안정성을 동시에 해결할 수 있는 더욱 정교한 방법이다. \cite{apic}
 
 \section{Conclusion}
 
-우리는 그리드 기반 2D 유체 애니메이션을 두 가지 접근법 (Semi-Lagrangian, Particle-in-cell)을 사용하여 제작할 수 있었고, 이를 실시간으로 돌릴 수 있었다. 결과적으로 Particle-in-cell이 Semi-Lagrangian 방법보다 유체의 역동적인 모습을 효과적으로 재현할 수 있었다. Particle-in-cell method의 경우에는 PIC와 FLIP을 혼용하여 사용했을 때, 총 에너지의 변화를 보아 FLIP이 dissipation을 줄여주는 역활을 하긴 하지만, 순수 PIC의 역동적인 모습을 재현하진 못한다는 것을 알 수 있었다. 현재의 구현체는 Volume preservation을 만족하지 못하는 문제가 있지만, 이를 particle reseeding 등의 방법을 통해 해결할 수 있을 것이다.
+우리는 그리드 기반 2D 유체 애니메이션을 두 가지 접근법 (Semi-Lagrangian, Particle-in-cell)을 사용하여 제작할 수 있었고, 이를 실시간으로 돌릴 수 있었다. 결과적으로 Semi-Lagrangian 방법은 잔잔한 유체의 모습을, 그리고 PIC 방법은 역동적인 유체의 모습을 재현할 수 있었다. 그리고 Semi-Lagrangian 방법에서는 시간에 따라 총 에너지가 점점 증가했지만, PIC 방법에서는 오히려 서서히 감소했다. 현재 구현체는 Semi-Lagrangian/PIC 모두 Volume preservation을 만족하지 못하는 문제가 있지만, 이를 particle reseeding 등의 방법을 통해 해결할 수 있을 것이다.
 
+\newpage 
 
 \begin{thebibliography}{9}
 \bibitem{fluid-sim-cg}
