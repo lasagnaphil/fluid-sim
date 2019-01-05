@@ -7,13 +7,13 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <mathfu/glsl_mappings.h>
 #include <Map.h>
 #include <Queue.h>
 #include <Defer.h>
-#include <math/Utils.h>
+#include <math_utils.h>
 #include <queue>
 
+#include <vec2d.h>
 #include "immintrin.h"
 
 template <typename T, size_t NX, size_t NY>
@@ -183,7 +183,7 @@ struct alignas(32) Array2D<double, NX, NY> {
 
     double infiniteNorm() const {
 #ifdef USE_AVX_SIMD
-        using utils::max;
+        using aml::max;
         union {
             double results[4];
             __m256d results_simd;
@@ -205,7 +205,7 @@ struct alignas(32) Array2D<double, NX, NY> {
 #endif
     }
 
-    double triCubic(mathfu::vec2d p) {
+    double triCubic(vec2d p) {
         int x = (int) p.x, y = (int) p.y;
         if (x < 0 || x >= NX || y < 0 || y >= NY) {
             return 0;
@@ -236,7 +236,7 @@ struct alignas(32) Array2D<double, NX, NY> {
         v[2] = -1.5 * CUBE (dy) + 2 * SQR (dy) + 0.5 * dy;
         v[3] =  0.5 * CUBE (dy) - 0.5 * SQR (dy);
 
-        using utils::clamp;
+        using aml::clamp;
         int x1 = clamp<int>(x-1, 0, NX - 1);
         int x2 = clamp<int>(x  , 0, NX - 1);
         int x3 = clamp<int>(x+1, 0, NX - 1);
@@ -322,16 +322,16 @@ struct alignas(32) Array2D<double, NX, NY> {
 #undef SQR
     }
 
-    void linearDistribute(mathfu::vec2d pos, double value) {
+    void linearDistribute(vec2d pos, double value) {
         int ui = (int) pos.x;
         int uj = (int) pos.y;
 
-        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+        auto disp = vec2d {pos.x - ui, pos.y - uj};
 
-        double x1 = utils::clamp<int>(ui, 0, NX - 1);
-        double x2 = utils::clamp<int>(ui + 1, 0, NX - 1);
-        double y1 = utils::clamp<int>(uj, 0, NY - 1);
-        double y2 = utils::clamp<int>(uj + 1, 0, NY - 1);
+        double x1 = aml::clamp<int>(ui, 0, NX - 1);
+        double x2 = aml::clamp<int>(ui + 1, 0, NX - 1);
+        double y1 = aml::clamp<int>(uj, 0, NY - 1);
+        double y2 = aml::clamp<int>(uj + 1, 0, NY - 1);
 
         (*this)(x1, y1) += (1 - disp.x) * (1 - disp.y) * value;
         (*this)(x2, y1) += disp.x * (1 - disp.y) * value;
@@ -339,17 +339,17 @@ struct alignas(32) Array2D<double, NX, NY> {
         (*this)(x2, y2) += disp.x * disp.y * value;
     }
 
-    double linearExtract(mathfu::vec2d pos) {
+    double linearExtract(vec2d pos) {
         int ui = (int) pos.x;
         int uj = (int) pos.y;
-        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+        auto disp = vec2d {pos.x - ui, pos.y - uj};
 
         double value = 0.0f;
 
-        double x1 = utils::clamp<int>(ui, 0, NX - 1);
-        double x2 = utils::clamp<int>(ui + 1, 0, NX - 1);
-        double y1 = utils::clamp<int>(uj, 0, NY - 1);
-        double y2 = utils::clamp<int>(uj + 1, 0, NY - 1);
+        double x1 = aml::clamp<int>(ui, 0, NX - 1);
+        double x2 = aml::clamp<int>(ui + 1, 0, NX - 1);
+        double y1 = aml::clamp<int>(uj, 0, NY - 1);
+        double y2 = aml::clamp<int>(uj + 1, 0, NY - 1);
 
         value += (*this)(x1, y1) * (1 - disp.x) * (1 - disp.y);
         value += (*this)(x2, y1) * disp.x * (1 - disp.y);
@@ -359,24 +359,24 @@ struct alignas(32) Array2D<double, NX, NY> {
         return value;
     }
 
-    void catmullRomDistribute(mathfu::vec2d pos, double value) {
+    void catmullRomDistribute(vec2d pos, double value) {
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
-        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+        auto disp = vec2d {pos.x - ui, pos.y - uj};
         double kx1 = 0.5 * (0.5 - disp.x) * (0.5 - disp.x);
         double kx2 = (0.75 - disp.x * disp.x);
         double kx3 = 0.5 * (0.5 + disp.x) * (0.5 + disp.x);
         double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
         double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
-        double x1 = utils::clamp<int>(ui - 1, 0, NX - 1);
-        double x2 = utils::clamp<int>(ui    , 0, NX - 1);
-        double x3 = utils::clamp<int>(ui + 1, 0, NX - 1);
-        double x4 = utils::clamp<int>(ui + 2, 0, NX - 1);
-        double y1 = utils::clamp<int>(uj - 1, 0, NY - 1);
-        double y2 = utils::clamp<int>(uj    , 0, NY - 1);
-        double y3 = utils::clamp<int>(uj + 1, 0, NY - 1);
-        double y4 = utils::clamp<int>(uj + 2, 0, NY - 1);
+        double x1 = aml::clamp<int>(ui - 1, 0, NX - 1);
+        double x2 = aml::clamp<int>(ui    , 0, NX - 1);
+        double x3 = aml::clamp<int>(ui + 1, 0, NX - 1);
+        double x4 = aml::clamp<int>(ui + 2, 0, NX - 1);
+        double y1 = aml::clamp<int>(uj - 1, 0, NY - 1);
+        double y2 = aml::clamp<int>(uj    , 0, NY - 1);
+        double y3 = aml::clamp<int>(uj + 1, 0, NY - 1);
+        double y4 = aml::clamp<int>(uj + 2, 0, NY - 1);
         if (disp.x < 0.5 && disp.y < 0.5) {
             (*this)(x1, y1) += kx1 * ky1 * value;
             (*this)(x1, y2) += kx1 * ky2 * value;
@@ -423,25 +423,25 @@ struct alignas(32) Array2D<double, NX, NY> {
         }
     }
 
-    double catmullRomExtract(mathfu::vec2d pos) {
+    double catmullRomExtract(vec2d pos) {
         double value = 0.0;
         int ui = (int) (pos.x);
         int uj = (int) (pos.y);
-        auto disp = mathfu::vec2d(pos.x - ui, pos.y - uj);
+        auto disp = vec2d {pos.x - ui, pos.y - uj};
         double kx1 = 0.5 * (0.5 - disp.x) * (0.5 - disp.x);
         double kx2 = (0.75 - disp.x * disp.x);
         double kx3 = 0.5 * (0.5 + disp.x) * (0.5 + disp.x);
         double ky1 = 0.5 * (0.5 - disp.y) * (0.5 - disp.y);
         double ky2 = (0.75 - disp.y * disp.y);
         double ky3 = 0.5 * (0.5 + disp.y) * (0.5 + disp.y);
-        double x1 = utils::clamp<int>(ui - 1, 0, NX - 1);
-        double x2 = utils::clamp<int>(ui    , 0, NX - 1);
-        double x3 = utils::clamp<int>(ui + 1, 0, NX - 1);
-        double x4 = utils::clamp<int>(ui + 2, 0, NX - 1);
-        double y1 = utils::clamp<int>(uj - 1, 0, NY - 1);
-        double y2 = utils::clamp<int>(uj    , 0, NY - 1);
-        double y3 = utils::clamp<int>(uj + 1, 0, NY - 1);
-        double y4 = utils::clamp<int>(uj + 2, 0, NY - 1);
+        double x1 = aml::clamp<int>(ui - 1, 0, NX - 1);
+        double x2 = aml::clamp<int>(ui    , 0, NX - 1);
+        double x3 = aml::clamp<int>(ui + 1, 0, NX - 1);
+        double x4 = aml::clamp<int>(ui + 2, 0, NX - 1);
+        double y1 = aml::clamp<int>(uj - 1, 0, NY - 1);
+        double y2 = aml::clamp<int>(uj    , 0, NY - 1);
+        double y3 = aml::clamp<int>(uj + 1, 0, NY - 1);
+        double y4 = aml::clamp<int>(uj + 2, 0, NY - 1);
         if (disp.x < 0.5 && disp.y < 0.5) {
             value += kx1 * ky1 * (*this)(x1, y1);
             value += kx1 * ky2 * (*this)(x1, y2);
@@ -490,7 +490,6 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
-        using mathfu::vec2i;
         auto Wu = std::queue<vec2i>();
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX; i++) {
@@ -500,7 +499,7 @@ struct alignas(32) Array2D<double, NX, NY> {
                         (j > 0 && intMask(i, j-1) == 0) ||
                         (j < NY - 1 && intMask(i, j+1) == 0))) {
                     intMask(i, j) = 1;
-                    Wu.push(vec2i(i, j));
+                    Wu.push(vec2i {(int)i, (int)j});
                 }
             }
         }
@@ -510,7 +509,7 @@ struct alignas(32) Array2D<double, NX, NY> {
             int x = pos.x, y = pos.y;
             double sum = 0.0;
             int count = 0;
-            for (auto neighbor : {vec2i(x-1,y), vec2i(x+1,y), vec2i(x,y-1), vec2i(x,y+1)}) {
+            for (auto neighbor : {vec2i{x-1,y}, vec2i{x+1,y}, vec2i{x,y-1}, vec2i{x,y+1}}) {
                 if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
                 if (intMask(neighbor.x, neighbor.y) < intMask(x,y)) {
                     sum += (*this)(neighbor.x, neighbor.y);
@@ -518,7 +517,7 @@ struct alignas(32) Array2D<double, NX, NY> {
                 }
             }
             (*this)(x, y) = count == 0? 0 : sum / count;
-            for (auto neighbor : {vec2i(x-1,y), vec2i(x+1,y), vec2i(x,y-1), vec2i(x,y+1)}) {
+            for (auto neighbor : {vec2i{x-1,y}, vec2i{x+1,y}, vec2i{x,y-1}, vec2i{x,y+1}}) {
                 if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
                 if (intMask(neighbor.x, neighbor.y) == UINT32_MAX) {
                     intMask(neighbor.x, neighbor.y) = intMask(x,y) + 1;

@@ -38,10 +38,10 @@ class WaterRenderer3D {
     GLuint voxelVertexVBO;
     GLuint cellOffsetVBO;
 
-    mathfu::vec3fp vertices[LINE_VERTEX_COUNT];
-    mathfu::vec4fp vertexColors[LINE_VERTEX_COUNT];
+    vec3f vertices[LINE_VERTEX_COUNT];
+    vec4f vertexColors[LINE_VERTEX_COUNT];
     float cubeVertices[3*36];
-    StackVec<mathfu::vec3fp, LINE_VERTEX_COUNT> waterVoxelLocations = {};
+    StackVec<vec3f, LINE_VERTEX_COUNT> waterVoxelLocations = {};
 
     Shader lineShader;
     Shader voxelShader;

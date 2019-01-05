@@ -9,6 +9,7 @@
 
 #include "FirstPersonCamera.h"
 #include "Camera2D.h"
+#include "vec2d.h"
 
 struct WaterSim2D;
 struct WaterRenderer2D;
@@ -16,7 +17,7 @@ struct WaterSim3D;
 struct WaterRenderer3D;
 
 struct AppSettings {
-    mathfu::vec2i screenSize = {800, 600};
+    vec2i screenSize = {800, 600};
 };
 
 struct App {
@@ -25,7 +26,7 @@ struct App {
     };
     static constexpr int MAX_SHADERS = 16;
 
-    void init(mathfu::vec2i screenSize, Mode mode);
+    void init(vec2i screenSize, Mode mode);
     void free();
     void start();
     void screenshot(const char* filename);

@@ -4,9 +4,9 @@
 //
 
 #include <ctime>
+#include <math_utils.h>
 #include <Defer.h>
 #include <Queue.h>
-#include <math/Utils.h>
 #include <log.h>
 #include <File.h>
 #include "WaterSim2D.h"
@@ -15,8 +15,6 @@
 #define USE_GHOST_PRESSURE
 #define USE_LEVEL_SET
 #define USE_RESEEDING
-
-using namespace mathfu;
 
 inline double randf(float max) {
     return ((double)rand()/(double)RAND_MAX) * max;
@@ -104,14 +102,14 @@ void WaterSim2D::setup(double dt, double dx, double dr, double rho, double gravi
                 constexpr float dist = 1.0f / PARTICLES_PER_CELL_SQRT;
                 int x = k % PARTICLES_PER_CELL_SQRT;
                 int y = k / PARTICLES_PER_CELL_SQRT;
-                particles.push(vec2d(((double) i + dist * x + randf(dist)) * dx, ((double) j + dist * y + randf(dist)) * dx));
+                particles.push(vec2d {((double) i + dist * x + randf(dist)) * dx, ((double) j + dist * y + randf(dist)) * dx});
             }
         }
     });
 
     particleVels.resize(PARTICLES_PER_CELL*fluidCount);
     for (int i = 0; i < PARTICLES_PER_CELL*fluidCount; i++) {
-        particleVels[i] = vec2d(0.0, 0.0);
+        particleVels[i] = vec2d {0.0, 0.0};
     }
 
     waterVolume = fluidCount * dx * dx;
@@ -248,10 +246,10 @@ void WaterSim2D::transferVelocityToGrid() {
     for (int e = 0; e < particles.size; e++) {
         auto xp = particles[e];
         auto vp = particleVels[e];
-        auto upos = vec2d(xp.x / dx, xp.y / dx - 0.5);
+        auto upos = vec2d {xp.x / dx, xp.y / dx - 0.5};
         mac.u.linearDistribute(upos, vp.x);
         udiv->linearDistribute(upos, 1.0);
-        auto vpos = vec2d(xp.x / dx - 0.5, xp.y / dx);
+        auto vpos = vec2d {xp.x / dx - 0.5, xp.y / dx};
         mac.v.linearDistribute(vpos, vp.y);
         vdiv->linearDistribute(vpos, 1.0);
     }
@@ -297,7 +295,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
 #pragma omp parallel for
     for (int j = 0; j < SIZEY; j++) {
         for (int i = 0; i < SIZEX + 1; i++) {
-            vec2d x_p = vec2d((double)i, ((double)j + 0.5)) * dx;
+            vec2d x_p = vec2d {(double)i, ((double)j + 0.5)} * dx;
             auto k1 = mac.velInterp(x_p);
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
@@ -310,7 +308,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
 #pragma omp parallel for
     for (int j = 0; j < SIZEY + 1; j++) {
         for (int i = 0; i < SIZEX; i++) {
-            vec2d x_p = vec2d((double)i + 0.5, ((double)j)) * dx;
+            vec2d x_p = vec2d {(double)i + 0.5, ((double)j)} * dx;
             auto k1 = mac.velInterp(x_p);
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
@@ -362,7 +360,7 @@ void WaterSim2D::applyProjection() {
                 else if (cell(i-1,j) == CellType::EMPTY) {
                     double phi1 = waterLevelSet.phi(i-1, j);
                     double phi0 = waterLevelSet.phi(i, j);
-                    Adiag(i,j) -= scaleA * utils::max(phi1 / phi0, -1e3);
+                    Adiag(i,j) -= scaleA * aml::max(phi1 / phi0, -1e3);
                 }
                 if (cell(i+1,j) == CellType::FLUID) {
                     Adiag(i,j) += scaleA;
@@ -371,7 +369,7 @@ void WaterSim2D::applyProjection() {
                 else if (cell(i+1,j) == CellType::EMPTY) {
                     double phi1 = waterLevelSet.phi(i+1, j);
                     double phi0 = waterLevelSet.phi(i, j);
-                    Adiag(i,j) += scaleA * (1 - utils::max(phi1 / phi0, -1e3));
+                    Adiag(i,j) += scaleA * (1 - aml::max(phi1 / phi0, -1e3));
                 }
                 if (cell(i,j-1) == CellType::FLUID) {
                     Adiag(i,j) += scaleA;
@@ -379,7 +377,7 @@ void WaterSim2D::applyProjection() {
                 else if (cell(i,j-1) == CellType::EMPTY) {
                     double phi1 = waterLevelSet.phi(i, j-1);
                     double phi0 = waterLevelSet.phi(i, j);
-                    Adiag(i,j) -= scaleA * utils::max(phi1 / phi0, -1e3);
+                    Adiag(i,j) -= scaleA * aml::max(phi1 / phi0, -1e3);
                 }
                 if (cell(i,j+1) == CellType::FLUID) {
                     Adiag(i,j) += scaleA;
@@ -388,7 +386,7 @@ void WaterSim2D::applyProjection() {
                 else if (cell(i,j+1) == CellType::EMPTY) {
                     double phi1 = waterLevelSet.phi(i, j+1);
                     double phi0 = waterLevelSet.phi(i, j);
-                    Adiag(i,j) += scaleA * (1 - utils::max(phi1 / phi0, -1e3));
+                    Adiag(i,j) += scaleA * (1 - aml::max(phi1 / phi0, -1e3));
                 }
             }
         }
@@ -576,13 +574,13 @@ void WaterSim2D::updateVelocity() {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i-1, j);
                         double phi0 = waterLevelSet.phi(i, j);
-                        newMac.u(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
+                        newMac.u(i,j) -= scale * (1 - aml::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i-1, j);
-                        newMac.u(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i-1,j);
+                        newMac.u(i,j) -= scale * (aml::max(phi1/phi0, -1e3) - 1) * p(i-1,j);
                     }
 #endif
                     else if (i > 0) {
@@ -605,13 +603,13 @@ void WaterSim2D::updateVelocity() {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j-1);
                         double phi0 = waterLevelSet.phi(i, j);
-                        newMac.v(i,j) -= scale * (1 - utils::max(phi1/phi0, -1e3)) * p(i,j);
+                        newMac.v(i,j) -= scale * (1 - aml::max(phi1/phi0, -1e3)) * p(i,j);
                     }
                     else if (cell(i,j) == CellType::EMPTY) {
                         // account for ghost pressures
                         double phi1 = waterLevelSet.phi(i, j);
                         double phi0 = waterLevelSet.phi(i, j-1);
-                        newMac.v(i,j) -= scale * (utils::max(phi1/phi0, -1e3) - 1) * p(i,j-1);
+                        newMac.v(i,j) -= scale * (aml::max(phi1/phi0, -1e3) - 1) * p(i,j-1);
                     }
 #endif
                     else if (j > 0) {
@@ -644,10 +642,10 @@ void WaterSim2D::updateParticleVelocities() {
 
 #pragma omp parallel for
     for (int e = 0; e < particles.size; e++) {
-        vec2d upos = vec2d(particles[e].x / dx, particles[e].y / dx - 0.5);
-        vec2d vpos = vec2d(particles[e].x / dx - 0.5, particles[e].y / dx);
-        vec2d picVel = {newMac.u.linearExtract(upos), newMac.v.linearExtract(vpos)};
-        vec2d flipVel = particleVels[e] + vec2d {uDiff.linearExtract(upos), vDiff.linearExtract(vpos)};
+        auto upos = vec2d {particles[e].x / dx, particles[e].y / dx - 0.5};
+        auto vpos = vec2d {particles[e].x / dx - 0.5, particles[e].y / dx};
+        auto picVel = vec2d {newMac.u.linearExtract(upos), newMac.v.linearExtract(vpos)};
+        auto flipVel = particleVels[e] + vec2d {uDiff.linearExtract(upos), vDiff.linearExtract(vpos)};
         particleVels[e] = (double)picFlipAlpha * picVel + (1 - (double)picFlipAlpha) * flipVel;
     }
 
@@ -668,7 +666,7 @@ void WaterSim2D::applyAdvection() {
     }
     if (cmax > 5.0) {
         log_warn("Particle velocity violates CFL condition! (C=%f, vel=%f, pos=(%f, %f))",
-                cmax, particles[emax].Length(), particles[emax].x, particles[emax].y);
+                cmax, aml::norm(particles[emax]), particles[emax].x, particles[emax].y);
     }
 
 
@@ -717,7 +715,7 @@ double WaterSim2D::maxVelocity() {
     double maxVel = 0.0f;
     iterate([&](size_t i, size_t j) {
         if (cell(i,j) == CellType::FLUID) {
-            double vel = mac.velInterp(vec2d(i,j)*dx).Length();
+            double vel = aml::norm(mac.velInterp(vec2d{(double)i,(double)j}*dx));
             if (vel > maxVel) maxVel = vel;
         }
     });
@@ -725,15 +723,15 @@ double WaterSim2D::maxVelocity() {
 }
 
 vec2d WaterSim2D::getGridCenter() {
-    return vec2d(SIZEX * dx / 2, SIZEY * dx / 2);
+    return vec2d {SIZEX * dx / 2, SIZEY * dx / 2};
 }
 
 
-mathfu::vec2d WaterSim2D::clampPos(mathfu::vec2d from, mathfu::vec2d to) {
+vec2d WaterSim2D::clampPos(vec2d from, vec2d to) {
     double offset = 1e-3;
     vec2d clamped = {
-        utils::clamp<double>(to.x, (1.0 + offset) * dx, (SIZEX-1.0 - offset)*dx),
-        utils::clamp<double>(to.y, (1.0 + offset) * dx, (SIZEY-1.0 - offset)*dx)
+        aml::clamp<double>(to.x, (1.0 + offset) * dx, (SIZEX-1.0 - offset)*dx),
+        aml::clamp<double>(to.y, (1.0 + offset) * dx, (SIZEY-1.0 - offset)*dx)
     };
     return clamped;
     /*
@@ -830,7 +828,7 @@ void WaterSim2D::createWaterLevelSet() {
             if (cell(i, j) == CellType::FLUID) {
                 waterVolume += dx * dx;
                 auto vel = mac.velInterp(vec2d{i*dx,j*dx});
-                totalEnergy += 0.5 * (rho * dx * dx) * vel.LengthSquared();
+                totalEnergy += 0.5 * (rho * dx * dx) * aml::normsq(vel);
                 totalEnergy -= (rho * dx * dx) * (gravity.x * (i*dx) + gravity.y * (j*dx));
             }
         }
@@ -839,7 +837,7 @@ void WaterSim2D::createWaterLevelSet() {
     for (int e = 0; e < particles.size; e++) {
         auto pos = particles[e];
         auto vel = particleVels[e];
-        particleTotalEnergy += 0.5 * (rho * dx * dx / (particlesPerCellSqrt * particlesPerCellSqrt)) * vel.LengthSquared();
+        particleTotalEnergy += 0.5 * (rho * dx * dx / (particlesPerCellSqrt * particlesPerCellSqrt)) * aml::normsq(vel);
         particleTotalEnergy -= (rho * dx * dx / (particlesPerCellSqrt * particlesPerCellSqrt)) * (gravity.x * pos.x + gravity.y * pos.y);
     }
     waterVolumeData.push(waterVolume);
@@ -857,7 +855,7 @@ void WaterSim2D::saveStats() {
     std::string buf;
     buf += "Total Volume, Total Energy, Total Energy (Particle) \n";
     for (int i = 0; i < waterVolumeData.size; i++) {
-        auto str = String::fmt("%f, %f, %f\n", waterVolumeData[i], totalEnergyData[i], particleTotalEnergyData[i]);
+        auto str = String::fmt("%f, %f, %f\n", waterVolumeData[i], totalEnergyData[i], particleTotalEnergyData[i]).unwrap();
         buf += str.data();
         str.free();
     }
@@ -865,7 +863,7 @@ void WaterSim2D::saveStats() {
     file.close();
 }
 
-void LevelSet::constructFromParticles(Vec<mathfu::vec2d> particles, double dr) {
+void LevelSet::constructFromParticles(Vec<vec2d> particles, double dr) {
     auto* t = new Array2D<size_t, SIZEX, SIZEY>();
     defer {delete t;};
 
@@ -919,7 +917,7 @@ void LevelSet::redistance() {
     oldPhi->copyFrom(phi);
     for (size_t j = 0; j < SIZEY - 1; j++) {
         for (size_t i = 0; i < SIZEX - 1; i++) {
-            using utils::sgn;
+            using aml::sgn;
             double phi0 = (*oldPhi)(i,j);
             double phi1 = (*oldPhi)(i+1,j);
             double phi2 = (*oldPhi)(i,j+1);
@@ -927,9 +925,9 @@ void LevelSet::redistance() {
                 if (abs(phi0 - phi1) > dx) {
                     double theta0 = phi0 / (phi0 - phi1);
                     double theta1 = phi1 / (phi0 - phi1);
-                    double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                    double newPhi0 = aml::sgn(phi0) * theta0 * dx;
                     if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
-                    double newPhi1 = utils::sgn(phi1) * theta1 * dx;
+                    double newPhi1 = aml::sgn(phi1) * theta1 * dx;
                     if (abs(newPhi1) < abs(phi1)) phi(i+1,j) = phi1;
                 }
                 (*isSurface)(i,j) = true;
@@ -939,9 +937,9 @@ void LevelSet::redistance() {
                 if (abs(phi0 - phi2) > dx) {
                     double theta0 = phi0 / (phi0 - phi2);
                     double theta2 = phi2 / (phi0 - phi2);
-                    double newPhi0 = utils::sgn(phi0) * theta0 * dx;
+                    double newPhi0 = aml::sgn(phi0) * theta0 * dx;
                     if (abs(newPhi0) < abs(phi0)) phi(i,j) = phi0;
-                    double newPhi2 = utils::sgn(phi2) * theta2 * dx;
+                    double newPhi2 = aml::sgn(phi2) * theta2 * dx;
                     if (abs(newPhi2) < abs(phi2)) phi(i,j+1) = phi2;
                 }
                 (*isSurface)(i,j) = true;
@@ -958,13 +956,13 @@ void LevelSet::redistance() {
         }
     }
 
-    using utils::sgn;
+    using aml::sgn;
     for (int k = 0; k < 4; k++) {
         for (size_t j = 1; j < SIZEY; j++) {
             for (size_t i = 1; i < SIZEX; i++) {
                 if (phi(i,j) >= 0) continue;
-                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j-1)));
-                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j-1)));
+                double phi0 = aml::min(abs(phi(i-1,j)), abs(phi(i,j-1)));
+                double phi1 = aml::max(abs(phi(i-1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
@@ -977,8 +975,8 @@ void LevelSet::redistance() {
         for (size_t j = 1; j < SIZEY; j++) {
             for (size_t i = SIZEX - 1; i-- > 0;) {
                 if (phi(i,j) >= 0) continue;
-                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j-1)));
-                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j-1)));
+                double phi0 = aml::min(abs(phi(i+1,j)), abs(phi(i,j-1)));
+                double phi1 = aml::max(abs(phi(i+1,j)), abs(phi(i,j-1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
@@ -991,8 +989,8 @@ void LevelSet::redistance() {
         for (size_t j = SIZEY - 1; j-- > 0;) {
             for (size_t i = 1; i < SIZEX; i++) {
                 if (phi(i,j) >= 0) continue;
-                double phi0 = utils::min(abs(phi(i-1,j)), abs(phi(i,j+1)));
-                double phi1 = utils::max(abs(phi(i-1,j)), abs(phi(i,j+1)));
+                double phi0 = aml::min(abs(phi(i-1,j)), abs(phi(i,j+1)));
+                double phi1 = aml::max(abs(phi(i-1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));
@@ -1005,8 +1003,8 @@ void LevelSet::redistance() {
         for (size_t j = SIZEY - 1; j-- > 0;) {
             for (size_t i = SIZEX - 1; i-- > 0;) {
                 if (phi(i,j) >= 0) continue;
-                double phi0 = utils::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
-                double phi1 = utils::max(abs(phi(i+1,j)), abs(phi(i,j+1)));
+                double phi0 = aml::min(abs(phi(i+1,j)), abs(phi(i,j+1)));
+                double phi1 = aml::max(abs(phi(i+1,j)), abs(phi(i,j+1)));
                 double d = phi0 + dx;
                 if (d > phi1) {
                     d = 0.5 * (phi0 + phi1 + sqrt(2*dx*dx - (phi1 - phi0)*(phi1 - phi0)));

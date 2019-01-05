@@ -82,5 +82,5 @@ set(STB_DIR deps/stb)
 target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
 
 # mathfu
-set(MATHFU_DIR deps/mathfu/include)
-target_include_directories(${PROJECT_NAME} PRIVATE ${MATHFU_DIR})
+set(ALTMATH_DIR deps/altmath/src)
+target_include_directories(${PROJECT_NAME} PRIVATE ${ALTMATH_DIR})

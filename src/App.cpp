@@ -10,6 +10,7 @@
 #include <imgui_impl_opengl3.h>
 #include "Defer.h"
 #include "log.h"
+#include <vec3.h>
 
 #include "InputManager.h"
 
@@ -62,7 +63,7 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id, GLenum severi
     }
 }
 
-void App::init(mathfu::vec2i screenSize, Mode mode) {
+void App::init(vec2i screenSize, Mode mode) {
     settings.screenSize = screenSize;
     this->mode = mode;
 
@@ -136,7 +137,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
     if (mode == Mode::Dim2) {
         waterSim2D = new WaterSim2D();
         waterSim2D->setup(WaterSimSettings::Dim2D::DT, WaterSimSettings::Dim2D::DX, WaterSimSettings::Dim2D::DR, 997.0, -9.81);
-        camera2d = Camera2D::create(&settings, vec2f(waterSim2D->getGridCenter()));
+        camera2d = Camera2D::create(&settings, aml::toFloat(waterSim2D->getGridCenter()));
         camera2d.zoom = 64.0f * (0.001 / waterSim2D->dx);
         waterRenderer2D = new WaterRenderer2D();
         waterRenderer2D->setup(waterSim2D, &camera2d);
@@ -145,7 +146,7 @@ void App::init(mathfu::vec2i screenSize, Mode mode) {
         waterSim3D = new WaterSim3D();
         waterSim3D->setup();
         fpsCamera = FirstPersonCamera::create(&settings);
-        fpsCamera.transform.pos = vec3f(0.5f, 0.5f, 3.0f);
+        fpsCamera.transform.pos = vec4f {0.5f, 0.5f, 3.0f, 0.f};
         waterRenderer3D = new WaterRenderer3D();
         waterRenderer3D->setup(waterSim3D, &fpsCamera);
     }
@@ -247,7 +248,7 @@ void App::start() {
         static int imageNum = 0;
         auto inputMgr = InputManager::get();
         if (inputMgr->isKeyEntered(SDL_SCANCODE_P)) {
-            auto name = String::fmt("Screenshot %d.bmp", imageNum);
+            auto name = String::fmt("Screenshot %d.bmp", imageNum).unwrap();
             screenshot(name.data());
             name.free();
             imageNum++;

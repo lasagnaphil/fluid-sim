@@ -7,7 +7,7 @@
 
 #include <cstdint>
 #include <StackVec.h>
-#include <mathfu/glsl_mappings.h>
+#include <vec2d.h>
 #include "WaterSimSettings.h"
 
 #include "Array2D.h"
@@ -27,7 +27,7 @@ struct LevelSet {
         return levelSet;
     }
 
-    void constructFromParticles(Vec<mathfu::vec2d> particles, double dr);
+    void constructFromParticles(Vec<vec2d> particles, double dr);
     void redistance();
 
     template <typename Fun> void fastSweepIterate(Fun f);
@@ -52,13 +52,13 @@ struct WaterSim2D {
     MACGrid2D<SIZEX, SIZEY> newMac = {};
     Array2D<double, SIZEX, SIZEY> p = {};
     Array2D<CellType, SIZEX, SIZEY> cell = {};
-    Vec<mathfu::vec2d> particles = {};
-    Vec<mathfu::vec2d> particleVels = {};
+    Vec<vec2d> particles = {};
+    Vec<vec2d> particleVels = {};
 
     LevelSet waterLevelSet;
 
-    mathfu::vec2d gravity = {0, -9.81};
-    mathfu::vec2d origGravity = {0, -9.81};
+    vec2d gravity = {0, -9.81};
+    vec2d origGravity = {0, -9.81};
     double rho = 997.0;
 
     bool oscillateGravity = WaterSimSettings::Dim2D::OSCILLATE_GRAVITY;
@@ -127,11 +127,11 @@ struct WaterSim2D {
     double avgPressureInFluid();
     double maxVelocity();
 
-    mathfu::vec2d getGridCenter();
+    vec2d getGridCenter();
 
     void saveStats();
 
-    mathfu::vec2d clampPos(mathfu::vec2d from, mathfu::vec2d to);
+    vec2d clampPos(vec2d from, vec2d to);
 
     template <typename Fun>
     void iterateU(Fun f) const {

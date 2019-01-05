@@ -15,8 +15,6 @@
 #include "InputManager.h"
 #include "Camera2D.h"
 
-using namespace mathfu;
-
 static float origQuadVertices[12] = {
         0.0f, 0.0f,
         0.0f, 1.0f,
@@ -54,16 +52,16 @@ private:
     GLuint particleVBO;
     GLuint particleVelVBO;
 
-    vec2fp quadVertices[6];
-    StackVec<vec2fp, SIZEX*SIZEY> waterCellLocations = {};
-    StackVec<vec2fp, SIZEX*SIZEY> solidCellLocations = {};
-    StackVec<vec2fp, SIZEX*SIZEY> pressureCellLocations = {};
-    StackVec<vec2fp, 2*SIZEX*SIZEY> cellVels = {};
+    vec2f quadVertices[6];
+    StackVec<vec2f, SIZEX*SIZEY> waterCellLocations = {};
+    StackVec<vec2f, SIZEX*SIZEY> solidCellLocations = {};
+    StackVec<vec2f, SIZEX*SIZEY> pressureCellLocations = {};
+    StackVec<vec2f, 2*SIZEX*SIZEY> cellVels = {};
     StackVec<float, SIZEX*SIZEY> pressureCellValues = {};
-    StackVec<vec2fp, SIZEX*SIZEY> allCellLocations = {};
+    StackVec<vec2f, SIZEX*SIZEY> allCellLocations = {};
     StackVec<float, SIZEX*SIZEY> phiCellValues = {};
 
-    StackVec<vec2fp, 2*PARTICLES_PER_CELL*SIZEX*SIZEY> particleVelLines = {};
+    StackVec<vec2f, 2*PARTICLES_PER_CELL*SIZEX*SIZEY> particleVelLines = {};
 
     Shader cellShader;
     Shader particleShader;

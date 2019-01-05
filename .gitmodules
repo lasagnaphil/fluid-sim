@@ -1,6 +1,6 @@
 [submodule "deps/altlib"]
 	path = deps/altlib
 	url = git@github.com:lasagnaphil/altlib.git
-[submodule "deps/mathfu"]
-	path = deps/mathfu
-	url = git@github.com:lasagnaphil/mathfu.git
+[submodule "deps/altmath"]
+	path = deps/altmath
+	url = git@github.com:lasagnaphil/altmath.git
