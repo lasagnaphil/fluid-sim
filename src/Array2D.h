@@ -66,14 +66,22 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     static void* operator new(std::size_t nbytes) noexcept {
+#if __MINGW32__ || __MINGW64__
+        if (void *p = __mingw_aligned_malloc(nbytes, alignof(Array2D<double, NX, NY>))) {
+#else
         if (void *p = std::aligned_alloc(alignof(Array2D<double, NX, NY>), nbytes)) {
+#endif
             return p;
         }
         return nullptr;
     }
 
     static void operator delete(void* p) {
+#if __MINGW32__ || __MINGW64__
+        __mingw_aligned_free(p);
+#else
         std::free(p);
+#endif
     }
 
     Array2D operator-(const Array2D& rhs) {
