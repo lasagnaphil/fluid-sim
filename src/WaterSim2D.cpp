@@ -4,6 +4,7 @@
 //
 
 #include <ctime>
+#include <vec2dx4.h>
 #include <math_utils.h>
 #include <Defer.h>
 #include <Queue.h>
@@ -169,73 +170,7 @@ void WaterSim2D::runFrame() {
 }
 
 void WaterSim2D::update() {
-    auto inputMgr = InputManager::get();
-    /*
-    if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        if (mode == SimMode::SemiLagrangian) {
-            if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
-                stage = StageType::CreateLevelSet;
-                createLevelSet();
-            } else if (stage == StageType::CreateLevelSet) {
-                stage = StageType::UpdateLevelSet;
-                updateLevelSet();
-            } else if (stage == StageType::UpdateLevelSet) {
-                stage = StageType::ApplySemiLagrangianAdvection;
-                applySemiLagrangianAdvection();
-            } else if (stage == StageType::ApplySemiLagrangianAdvection) {
-                stage = StageType::ApplyGravity;
-                applyGravity();
-            } else if (stage == StageType::ApplyGravity) {
-                stage = StageType::ApplyProjection;
-                applyProjection();
-                updateVelocity();
-            } else if (stage == StageType::ApplyProjection) {
-                stage = StageType::UpdateVelocity;
-                updateVelocity();
-            } else if (stage == StageType::UpdateVelocity) {
-                stage = StageType::ApplyAdvection;
-                applyAdvection();
-                currentTime += dt;
-            }
-            rendered = false;
-        }
-        else if (mode == SimMode::PIC) {
-            if (stage == StageType::Init || stage == StageType::ApplyAdvection) {
-                stage = StageType::CreateLevelSet;
-                createLevelSet();
-            } else if (stage == StageType::CreateLevelSet) {
-                stage = StageType::UpdateLevelSet;
-                updateLevelSet();
-            } else if (stage == StageType::UpdateLevelSet) {
-                stage = StageType::TransferVelocityToGrid;
-                transferVelocityToGrid();
-            } else if (stage == StageType::TransferVelocityToGrid) {
-                stage = StageType::ApplyGravity;
-                applyGravity();
-            } else if (stage == StageType::ApplyGravity) {
-                stage = StageType::ApplyProjection;
-                applyProjection();
-            } else if (stage == StageType::ApplyProjection) {
-                stage = StageType::UpdateVelocity;
-                updateVelocity();
-            } else if (stage == StageType::UpdateVelocity) {
-                stage = StageType::UpdateParticleVelocities;
-                updateParticleVelocities();
-            } else if (stage == StageType::UpdateParticleVelocities) {
-                stage = StageType::ApplyAdvection;
-                applyAdvection();
-                currentTime += dt;
-            }
-            rendered = false;
-        }
-    }
-     */
     runFrame();
-    /*
-    if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        runFrame();
-    }
-     */
 }
 
 void WaterSim2D::transferVelocityToGrid() {
@@ -243,6 +178,7 @@ void WaterSim2D::transferVelocityToGrid() {
     mac.v.reset();
     auto udiv = new Array2D<double, SIZEX+1, SIZEY>();
     auto vdiv = new Array2D<double, SIZEX, SIZEY+1>();
+#if 1
     for (int e = 0; e < particles.size; e++) {
         auto xp = particles[e];
         auto vp = particleVels[e];
@@ -253,13 +189,23 @@ void WaterSim2D::transferVelocityToGrid() {
         mac.v.linearDistribute(vpos, vp.y);
         vdiv->linearDistribute(vpos, 1.0);
     }
-#pragma omp parallel for
+#else
+    for (int e = 0; e < aml::max<int>(4, particles.size+3); e += 4) {
+        auto xp = vec2dx4::load(&particles[e]);
+        auto vp = vec2dx4::load(&particleVels[e]);
+        auto upos = vec2dx4 {xp.x / dx, xp.y / dx - 0.5};
+        mac.u.linearDistribute(upos, vp.x);
+        udiv->linearDistribute(upos, vec4d::make(1.0));
+        auto vpos = vec2dx4 {xp.x / dx - 0.5, xp.y / dx};
+        mac.v.linearDistribute(vpos, vp.y);
+        vdiv->linearDistribute(vpos, vec4d::make(1.0));
+    }
+#endif
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX + 1; i++) {
             if ((*udiv)(i, j) > 0) mac.u(i, j) /= (*udiv)(i, j);
         }
     }
-#pragma omp parallel for
     for (size_t j = 0; j < SIZEY + 1; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
             if ((*vdiv)(i, j) > 0) mac.v(i, j) /= (*vdiv)(i, j);
@@ -269,13 +215,11 @@ void WaterSim2D::transferVelocityToGrid() {
     auto uintFlag = new Array2D<uint32_t, SIZEX+1, SIZEY>();
     auto vintFlag = new Array2D<uint32_t, SIZEX, SIZEY+1>();
 
-#pragma omp parallel for
     for (size_t j = 0; j < SIZEY; j++) {
         for (size_t i = 0; i < SIZEX + 1; i++) {
             (*uintFlag)(i,j) = mac.u(i,j) == 0.0? UINT32_MAX : 0;
         }
     }
-#pragma omp parallel for
     for (size_t j = 0; j < SIZEY + 1; j++) {
         for (size_t i = 0; i < SIZEX; i++) {
             (*vintFlag)(i,j) = mac.v(i,j) == 0.0? UINT32_MAX : 0;
@@ -300,7 +244,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
             auto x_p_new = x_p - ((2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3);
-            x_p_new = clampPos(x_p, x_p_new);
+            x_p_new = clampPos(x_p_new);
             mac.u(i,j) = mac.velInterpU(x_p_new);
         }
     }
@@ -313,7 +257,7 @@ void WaterSim2D::applySemiLagrangianAdvection() {
             auto k2 = mac.velInterp(x_p - 0.5*dt*k1);
             auto k3 = mac.velInterp(x_p - 0.75*dt*k2);
             auto x_p_new = x_p - ((2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3);
-            x_p_new = clampPos(x_p, x_p_new);
+            x_p_new = clampPos(x_p_new);
             mac.v(i,j) = mac.velInterpV(x_p_new);
         }
     }
@@ -678,7 +622,7 @@ void WaterSim2D::applyAdvection() {
         auto k3 = mac.velInterp(pos + 0.75*dt*k2);
 
         auto nextPos = pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
-        nextPos = clampPos(pos, nextPos);
+        nextPos = clampPos(nextPos);
 
         if (isnan(pos.x) || isnan(pos.y)) {
             log_error("Advected position is NaN! pos=(%d, %d), idx=%d", pos.x, pos.y, i);
@@ -727,40 +671,12 @@ vec2d WaterSim2D::getGridCenter() {
 }
 
 
-vec2d WaterSim2D::clampPos(vec2d from, vec2d to) {
-    double offset = 1e-3;
-    vec2d clamped = {
+vec2d WaterSim2D::clampPos(vec2d to) {
+    constexpr double offset = 1e-3;
+    return vec2d {
         aml::clamp<double>(to.x, (1.0 + offset) * dx, (SIZEX-1.0 - offset)*dx),
         aml::clamp<double>(to.y, (1.0 + offset) * dx, (SIZEY-1.0 - offset)*dx)
     };
-    return clamped;
-    /*
-    if (to.x != from.x) {
-        if (to.x < dx) {
-            double newX = (1 + 1e-6)*dx;
-            to.y = from.y + (to.y - from.y) * (newX - from.x) / (to.x - from.x);
-            to.x = newX;
-        }
-        else if (to.x >= (SIZEX-1)*dx) {
-            double newX = (SIZEX-1 - 1e-6)*dx;
-            to.y = from.y + (to.y - from.y) * (newX - from.x) / (to.x - from.x);
-            to.x = newX;
-        }
-    }
-    if (to.y != from.y) {
-        if (to.y < dx) {
-            double newY = (1 + 1e-6)*dx;
-            to.x = from.x + (to.x - from.x) * (newY - from.y) / (to.y - from.y);
-            to.y = newY;
-        }
-        else if (to.y >= (SIZEY-1)*dx) {
-            double newY = (SIZEY-1 - 1e-6)*dx;
-            to.x = from.x + (to.x - from.x) * (newY - from.y) / (to.y - from.y);
-            to.y = newY;
-        }
-    }
-     */
-    return to;
 }
 
 void WaterSim2D::createWaterLevelSet() {

@@ -131,7 +131,7 @@ struct WaterSim2D {
 
     void saveStats();
 
-    vec2d clampPos(vec2d from, vec2d to);
+    vec2d clampPos(vec2d to);
 
     template <typename Fun>
     void iterateU(Fun f) const {

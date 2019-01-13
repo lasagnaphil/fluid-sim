@@ -81,6 +81,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE imgui)
 set(STB_DIR deps/stb)
 target_include_directories(${PROJECT_NAME} PRIVATE ${STB_DIR})
 
-# mathfu
-set(ALTMATH_DIR deps/altmath/src)
-target_include_directories(${PROJECT_NAME} PRIVATE ${ALTMATH_DIR})
+# altmath
+set(ALTMATH_DIR deps/altmath)
+set(altmath_build_tests OFF)
+add_subdirectory(${ALTMATH_DIR})
+target_include_directories(${PROJECT_NAME} PUBLIC altmath)
+target_link_libraries(${PROJECT_NAME} PUBLIC altmath)

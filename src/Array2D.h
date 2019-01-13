@@ -10,10 +10,12 @@
 #include <Map.h>
 #include <Queue.h>
 #include <Defer.h>
-#include <math_utils.h>
 #include <queue>
 
+#include <math_utils.h>
+#include <vec_utils.h>
 #include <vec2d.h>
+#include <vec2dx4.h>
 #include "immintrin.h"
 
 template <typename T, size_t NX, size_t NY>
@@ -328,15 +330,37 @@ struct alignas(32) Array2D<double, NX, NY> {
 
         auto disp = vec2d {pos.x - ui, pos.y - uj};
 
-        double x1 = aml::clamp<int>(ui, 0, NX - 1);
-        double x2 = aml::clamp<int>(ui + 1, 0, NX - 1);
-        double y1 = aml::clamp<int>(uj, 0, NY - 1);
-        double y2 = aml::clamp<int>(uj + 1, 0, NY - 1);
+        int x1 = aml::clamp<int>(ui, 0, NX - 1);
+        int x2 = aml::clamp<int>(ui + 1, 0, NX - 1);
+        int y1 = aml::clamp<int>(uj, 0, NY - 1);
+        int y2 = aml::clamp<int>(uj + 1, 0, NY - 1);
 
         (*this)(x1, y1) += (1 - disp.x) * (1 - disp.y) * value;
         (*this)(x2, y1) += disp.x * (1 - disp.y) * value;
         (*this)(x1, y2) += (1 - disp.x) * disp.y * value;
         (*this)(x2, y2) += disp.x * disp.y * value;
+    }
+
+    void linearDistribute(vec2dx4 pos, vec4d value) {
+        auto floor = aml::toInt(aml::floor(pos));
+        auto disp = vec2dx4 {pos.x - aml::toDouble(floor.x), pos.y - aml::toDouble(floor.y)};
+
+        auto x1 = aml::clamp(floor.x, vec4i::make(0), vec4i::make(NX - 1));
+        auto x2 = aml::clamp(floor.x + 1, vec4i::make(0), vec4i::make(NX - 1));
+        auto y1 = aml::clamp(floor.y, vec4i::make(0), vec4i::make(NY - 1));
+        auto y2 = aml::clamp(floor.y + 1, vec4i::make(0), vec4i::make(NY - 1));
+
+        auto v1 = (1.0 - disp.x) * (1.0 - disp.y) * value;
+        auto v2 = disp.x * (1.0 - disp.y) * value;
+        auto v3 = (1.0 - disp.x) * disp.y * value;
+        auto v4 = disp.x * disp.y * value;
+
+        for (int i = 0; i < 4; i++) {
+            (*this)(x1.v[i], y1.v[i]) += v1.v[i];
+            (*this)(x2.v[i], y1.v[i]) += v2.v[i];
+            (*this)(x1.v[i], y2.v[i]) += v3.v[i];
+            (*this)(x2.v[i], y2.v[i]) += v4.v[i];
+        }
     }
 
     double linearExtract(vec2d pos) {
@@ -490,7 +514,7 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
-        auto Wu = std::queue<vec2i>();
+        auto Wu = Queue<vec2i>::create(4*NX*NY);
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX; i++) {
                 if (intMask(i, j) != 0 && (
@@ -499,13 +523,12 @@ struct alignas(32) Array2D<double, NX, NY> {
                         (j > 0 && intMask(i, j-1) == 0) ||
                         (j < NY - 1 && intMask(i, j+1) == 0))) {
                     intMask(i, j) = 1;
-                    Wu.push(vec2i {(int)i, (int)j});
+                    Wu.enq(vec2i {(int)i, (int)j});
                 }
             }
         }
-        while (Wu.size() > 0) {
-            vec2i pos = Wu.front();
-            Wu.pop();
+        while (Wu.size > 0) {
+            vec2i pos = Wu.deq();
             int x = pos.x, y = pos.y;
             double sum = 0.0;
             int count = 0;
@@ -521,7 +544,7 @@ struct alignas(32) Array2D<double, NX, NY> {
                 if (neighbor.x < 0 || neighbor.x >= NX || neighbor.y < 0 || neighbor.y >= NY) continue;
                 if (intMask(neighbor.x, neighbor.y) == UINT32_MAX) {
                     intMask(neighbor.x, neighbor.y) = intMask(x,y) + 1;
-                    Wu.push(neighbor);
+                    Wu.enq(neighbor);
                 }
             }
         }
