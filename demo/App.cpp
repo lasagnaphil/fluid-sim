@@ -14,10 +14,8 @@
 
 #include "InputManager.h"
 
-#include "FluidSim3D.h"
 #include "FluidSim2D.h"
 #include "FluidRenderer2D.h"
-#include "WaterRenderer3D.h"
 
 static void sdl_die(const char* message) {
     log_error("%s: %s\n", message, SDL_GetError());

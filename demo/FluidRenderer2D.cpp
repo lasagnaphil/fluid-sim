@@ -6,6 +6,7 @@
 
 #include <vec4f.h>
 #include "App.h"
+#include "FluidSim2D.h"
 
 const char* FluidRenderer2D::particleVS = R"SHADER(
 #version 330 core
@@ -418,7 +419,14 @@ void FluidRenderer2D::drawUI() {
         ImGui::Checkbox("Render level set", &renderLevelSet);
     }
     if (ImGui::CollapsingHeader("Performance")) {
-        sim->perfCounter.renderUI();
+        if (sim->perfCounter.sampleFinished) {
+            for (int i = 0; i < sim->perfCounter.average.size; i++) {
+                ImGui::Text("Stage %d: %f ms", i, sim->perfCounter.average[i]);
+            }
+            ImGui::Text("Avg time per frame: %f ms", sim->perfCounter.avgTimePerFrame);
+        } else {
+            ImGui::Text("Sampling frames...");
+        }
     }
 
     ImGui::End();

@@ -8,7 +8,6 @@
 #include <StackVec.h>
 #include <imgui.h>
 
-#include "FluidSimSettings.h"
 #include "Shader.h"
 #include "FluidSim2D.h"
 #include "FirstPersonCamera.h"

@@ -8,8 +8,6 @@
 #include <cstdint>
 #include <StackVec.h>
 #include <vec2d.h>
-#include "FluidSimSettings.h"
-
 #include "Array2D.h"
 #include "MACGrid2D.h"
 #include "PerformanceCounter.h"

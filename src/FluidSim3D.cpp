@@ -2,9 +2,8 @@
 // Created by lasagnaphil on 9/13/18.
 //
 #include <time.h>
+#include <Vec.h>
 #include "FluidSim3D.h"
-#include "FirstPersonCamera.h"
-#include "InputManager.h"
 #include "Defer.h"
 #include "log.h"
 
@@ -41,27 +40,7 @@ void FluidSim3D::runFrame() {
 }
 
 void FluidSim3D::update() {
-    static int nextStage = 0;
-    auto inputMgr = InputManager::get();
-    if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
-        /*
-        if (nextStage == 0) {
-            applyAdvection();
-            stage = Stage::ADVECTION;
-        }
-        else if (nextStage == 1) {
-            applyGravity();
-            stage = Stage::GRAVITY;
-        }
-        else if (nextStage == 2) {
-            applyProjection();
-            stage = Stage::PROJECTION;
-        }
-        nextStage = (nextStage + 1) % 3;
-        rendered = false;
-         */
-        runFrame();
-    }
+    runFrame();
 }
 
 void FluidSim3D::debugPrint() {

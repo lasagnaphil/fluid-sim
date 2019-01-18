@@ -11,7 +11,6 @@
 #include <log.h>
 #include <File.h>
 #include "FluidSim2D.h"
-#include "InputManager.h"
 
 #define USE_GHOST_PRESSURE
 #define USE_LEVEL_SET

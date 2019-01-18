@@ -10,5 +10,7 @@
     <mapping directory="$PROJECT_DIR$/deps/mathfu" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/mathfu/dependencies/fplutil" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/deps/mathfu/dependencies/googletest" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/deps/altlib" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/src/deps/altmath" vcs="Git" />
   </component>
 </project>

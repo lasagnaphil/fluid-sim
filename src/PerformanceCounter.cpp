@@ -49,17 +49,6 @@ void PerformanceCounter::endFrame() {
     }
 }
 
-void PerformanceCounter::renderUI() {
-    if (sampleFinished) {
-        for (int i = 0; i < average.size; i++) {
-            ImGui::Text("Stage %d: %f ms", i, average[i]);
-        }
-        ImGui::Text("Avg time per frame: %f ms", avgTimePerFrame);
-    } else {
-        ImGui::Text("Sampling frames...");
-    }
-}
-
 void PerformanceCounter::free() {
     samples.free();
     average.free();

@@ -4,8 +4,7 @@
 
 #ifndef FLUID_SIM_FLUIDSIM_H
 
-#include <glad/glad.h>
-
+#include <stdint.h>
 #include "FluidSimSettings.h"
 #include "MACGrid3D.h"
 
