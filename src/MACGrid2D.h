@@ -9,46 +9,65 @@
 #include <math_utils.h>
 #include "Array2D.h"
 
-template <size_t NX, size_t NY>
 struct MACGrid2D {
-    Array2D<double, NX + 1, NY> u;
-    Array2D<double, NX, NY + 1> v;
+    Array2D<double> u;
+    Array2D<double> v;
+    size_t NX;
+    size_t NY;
     double dx = 1;
+
+    static MACGrid2D create(size_t nx, size_t ny, double dx) {
+        return {
+            Array2D<double>::create(nx + 1, ny),
+            Array2D<double>::create(nx, ny + 1),
+            nx, ny, dx
+        };
+    }
+
+    void free() {
+        u.free();
+        v.free();
+    }
+
+    void copyFrom(const MACGrid2D& rhs) {
+        u.copyFrom(rhs.u);
+        v.copyFrom(rhs.v);
+    }
 
     vec2d velU(size_t i, size_t j) {
         if (i > 0 && i < NX)
-            return vec2d(
+            return vec2d{
                     u(i,j),
                     0.25 * (v(i-1,j) + v(i-1,j+1) + v(i,j) + v(i,j+1))
-            );
+            };
         else if (i == 0)
-            return vec2d(
+            return vec2d{
                     u(i,j),
                     0.25 * (v(i,j) + v(i,j+1))
-            );
+            };
         else
-            return vec2d(
+            return vec2d{
                     u(i,j),
                     0.25 * (v(i-1,j) + v(i-1,j+1))
-            );
+            };
     }
 
     vec2d velV(size_t i, size_t j) {
         if (j > 0 && j < NY)
-            return vec2d(
+            return vec2d{
                 0.25 * (u(i,j-1) + u(i+1,j-1) + u(i,j) + u(i+1,j)),
                 v(i,j)
-            );
+            };
         else if (j == 0)
-            return vec2d(
+            return vec2d{
                 0.25 * (u(i,j) + u(i+1,j)),
                 v(i,j)
-            );
+            };
         else
-            return vec2d(
+            return vec2d{
                 0.25 * (u(i,j-1) + u(i+1,j-1)),
                 v(i,j)
-            );
+            };
     }
 
     vec2d vel(size_t i, size_t j) {

@@ -419,8 +419,8 @@ void WaterRenderer2D::updateBuffers() {
     }
     if (renderCellVels) {
         cellVels.size = 0;
-        for (size_t j = 0; j < sim->SIZEY - 1; j++) {
-            for (size_t i = 0; i < sim->SIZEX - 1; i++) {
+        for (size_t j = 0; j < sim->sizeY - 1; j++) {
+            for (size_t i = 0; i < sim->sizeX - 1; i++) {
                 vec2d pos = vec2d {i + 0.5, j + 0.5} * sim->dx;
                 vec2d vel = sim->mac.velInterp(pos);
                 cellVels.push(vec2f {(float)pos.x, (float)pos.y});

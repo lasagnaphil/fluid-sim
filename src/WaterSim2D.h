@@ -15,16 +15,22 @@
 #include "PerformanceCounter.h"
 
 struct LevelSet {
-    static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
-
-    Array2D<double, SIZEX, SIZEY> phi = {};
+    Array2D<double> phi;
+    size_t sizeX;
+    size_t sizeY;
     double dx;
 
-    static LevelSet create(double dx) {
-        LevelSet levelSet;
-        levelSet.dx = dx;
-        return levelSet;
+    static LevelSet create(size_t sizeX, size_t sizeY, double dx) {
+        return {
+            Array2D<double>::create(sizeX, sizeY),
+            sizeX,
+            sizeY,
+            dx
+        };
+    }
+
+    void free() {
+        phi.free();
     }
 
     void constructFromParticles(Vec<vec2d> particles, double dr);
@@ -34,24 +40,22 @@ struct LevelSet {
 };
 
 struct WaterSim2D {
-    static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
     static constexpr int PARTICLES_PER_CELL_SQRT = WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT;
 #define SQR(x) ((x)*(x))
     static constexpr int PARTICLES_PER_CELL = SQR(WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT);
 #undef SQR
 
-    template <typename T>
-    using Grid2D = Array2D<T, SIZEX, SIZEY>;
-
     enum class CellType : uint8_t {
         EMPTY, FLUID, SOLID
     };
 
-    MACGrid2D<SIZEX, SIZEY> mac = {};
-    MACGrid2D<SIZEX, SIZEY> newMac = {};
-    Array2D<double, SIZEX, SIZEY> p = {};
-    Array2D<CellType, SIZEX, SIZEY> cell = {};
+    size_t sizeX;
+    size_t sizeY;
+
+    MACGrid2D mac;
+    MACGrid2D newMac;
+    Array2D<double> p;
+    Array2D<CellType> cell;
     Vec<vec2d> particles = {};
     Vec<vec2d> particleVels = {};
 
@@ -97,7 +101,7 @@ struct WaterSim2D {
     double particleTotalEnergy = 0.0;
     Vec<double> particleTotalEnergyData = {};
 
-    void setup(double dt, double dx, double dr, double rho, double gravity);
+    void setup(size_t nx, size_t ny, double dt, double dx, double dr, double rho, double gravity);
 
     void free();
 
@@ -135,8 +139,8 @@ struct WaterSim2D {
 
     template <typename Fun>
     void iterateU(Fun f) const {
-        for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t i = 0; i < SIZEX + 1; i++) {
+        for (size_t j = 0; j < sizeY; j++) {
+            for (size_t i = 0; i < sizeX + 1; i++) {
                 f(i, j);
             }
         }
@@ -144,8 +148,8 @@ struct WaterSim2D {
 
     template <typename Fun>
     void iterateV(Fun f) {
-        for (size_t j = 0; j < SIZEY + 1; j++) {
-            for (size_t i = 0; i < SIZEX; i++) {
+        for (size_t j = 0; j < sizeY + 1; j++) {
+            for (size_t i = 0; i < sizeX; i++) {
                 f(i, j);
             }
         }
@@ -153,8 +157,8 @@ struct WaterSim2D {
 
     template <typename Fun>
     void iterate(Fun f) {
-        for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t i = 0; i < SIZEX; i++) {
+        for (size_t j = 0; j < sizeY; j++) {
+            for (size_t i = 0; i < sizeX; i++) {
                 f(i, j);
             }
         }
@@ -162,8 +166,8 @@ struct WaterSim2D {
 
     template <typename Fun>
     void iterateBackwards(Fun f) {
-        for (int j = SIZEY; j >= 0; j--) {
-            for (size_t i = SIZEX; i-- > 0;) {
+        for (int j = sizeY; j >= 0; j--) {
+            for (size_t i = sizeX; i-- > 0;) {
                 f(i, j);
             }
         }
@@ -190,23 +194,23 @@ template<typename Fun>
 void LevelSet::fastSweepIterate(Fun f) {
     // Sweep with four possible directions, two times (to make sure)
     for (int k = 0; k < 4; k++) {
-        for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t i = 0; i < SIZEX; i++) {
+        for (size_t j = 0; j < sizeY; j++) {
+            for (size_t i = 0; i < sizeX; i++) {
                 f(i, j);
             }
         }
-        for (size_t j = 0; j < SIZEY; j++) {
-            for (size_t i = SIZEX; i-- > 0;) {
+        for (size_t j = 0; j < sizeY; j++) {
+            for (size_t i = sizeX; i-- > 0;) {
                 f(i, j);
             }
         }
-        for (size_t j = SIZEY; j-- > 0; ) {
-            for (size_t i = 0; i < SIZEX; i++) {
+        for (size_t j = sizeY; j-- > 0; ) {
+            for (size_t i = 0; i < sizeX; i++) {
                 f(i, j);
             }
         }
-        for (size_t j = SIZEY; j-- > 0; ) {
-            for (size_t i = SIZEX; i-- > 0;) {
+        for (size_t j = sizeY; j-- > 0; ) {
+            for (size_t i = sizeX; i-- > 0;) {
                 f(i, j);
             }
         }

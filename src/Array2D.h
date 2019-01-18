@@ -5,12 +5,13 @@
 #ifndef FLUID_SIM_ARRAY2D_H
 #define FLUID_SIM_ARRAY2D_H
 
-#include <cstddef>
-#include <cstdlib>
+#include <stddef.h>
+#include <stdlib.h>
 #include <Map.h>
 #include <Queue.h>
 #include <Defer.h>
-#include <queue>
+#include <Mem.h>
+#include <log.h>
 
 #include <math_utils.h>
 #include <vec_utils.h>
@@ -18,22 +19,34 @@
 #include <vec2dx4.h>
 #include "immintrin.h"
 
-template <typename T, size_t NX, size_t NY>
+template <typename T>
 struct Array2D {
-    T data[NY][NX] = {};
+    T* data = nullptr;
+    size_t NX;
+    size_t NY;
 
-    void copyFrom(Array2D& arr) {
+    static Array2D create(size_t nx, size_t ny) {
+        T* p = new T[nx*ny];
+        memset(p, 0, sizeof(T) * nx * ny);
+        return {p, nx, ny};
+    }
+
+    void free() {
+        delete[] data;
+    }
+
+    void copyFrom(const Array2D& arr) {
         memcpy(data, arr.data, sizeof(T) * NX * NY);
     }
 
     T& operator()(size_t i, size_t j) {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
-        return data[j][i];
+        return data[j*NX + i];
     }
 
     const T& operator()(size_t i, size_t j) const {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
-        return data[j][i];
+        return data[j*NX + i];
     }
 
     void reset() {
@@ -41,22 +54,43 @@ struct Array2D {
     }
 };
 
-template <size_t NX, size_t NY>
-struct alignas(32) Array2D<double, NX, NY> {
-    double data[NY][NX] = {};
+template <>
+struct Array2D<double> {
+    double* data = nullptr;
+    size_t NX;
+    size_t NY;
 
-    void copyFrom(Array2D& arr) {
+    static Array2D<double> create(size_t nx, size_t ny) {
+        size_t nbytes = sizeof(double)*nx*ny;
+        double* p = (double*) aligned_malloc(32, nbytes);
+        if (p) {
+            memset(p, 0, nbytes);
+            return {p, nx, ny};
+        }
+        else {
+            log_error("Failed to allocate memory for Array2D<double>!");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    void free() {
+        aligned_free(data);
+    }
+
+    void copyFrom(const Array2D& arr) {
+        assert(NX == arr.NX);
+        assert(NY == arr.NY);
         memcpy(data, arr.data, sizeof(double) * NX * NY);
     }
 
     double& operator()(size_t i, size_t j) {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
-        return data[j][i];
+        return data[j*NX + i];
     }
 
     const double& operator()(size_t i, size_t j) const {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
-        return data[j][i];
+        return data[j*NX + i];
     }
 
     bool isInBounds(size_t i, size_t j) const {
@@ -67,27 +101,11 @@ struct alignas(32) Array2D<double, NX, NY> {
         memset(data, 0, sizeof(double) * NY * NX);
     }
 
-    static void* operator new(std::size_t nbytes) noexcept {
-#if __MINGW32__ || __MINGW64__
-        if (void *p = __mingw_aligned_malloc(nbytes, alignof(Array2D<double, NX, NY>))) {
-#else
-        if (void *p = std::aligned_alloc(alignof(Array2D<double, NX, NY>), nbytes)) {
-#endif
-            return p;
-        }
-        return nullptr;
-    }
-
-    static void operator delete(void* p) {
-#if __MINGW32__ || __MINGW64__
-        __mingw_aligned_free(p);
-#else
-        std::free(p);
-#endif
-    }
-
     Array2D operator-(const Array2D& rhs) {
-        Array2D<double, NX, NY> result;
+        assert(NX == rhs.NX);
+        assert(NY == rhs.NY);
+
+        auto result = Array2D<double>::create(NX, NY);
 #ifdef USE_AVX_SIMD
         for (size_t i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
@@ -103,6 +121,9 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     Array2D& operator+=(const Array2D& rhs) {
+        assert(NX == rhs.NX);
+        assert(NY == rhs.NY);
+
 #ifdef USE_AVX_SIMD
         for (size_t i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
@@ -119,6 +140,9 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     Array2D& operator/=(const Array2D& rhs) {
+        assert(NX == rhs.NX);
+        assert(NY == rhs.NY);
+
 #ifdef USE_AVX_SIMD
         for (size_t i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
@@ -135,6 +159,9 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     void safeDivBy(const Array2D& rhs) {
+        assert(NX == rhs.NX);
+        assert(NY == rhs.NY);
+
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX; i++) {
                 if (rhs(i,j) != 0.0)
@@ -146,6 +173,11 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     void setMultiplyAdd(Array2D& a, double b, const Array2D& c) {
+        assert(NX == a.NX);
+        assert(NY == a.NY);
+        assert(NX == c.NX);
+        assert(NY == c.NY);
+
 #ifdef USE_AVX_SIMD
         for (size_t i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)a.data + i);
@@ -162,6 +194,9 @@ struct alignas(32) Array2D<double, NX, NY> {
     }
 
     double innerProduct(const Array2D& rhs) const {
+        assert(NX == rhs.NX);
+        assert(NY == rhs.NY);
+
 #ifdef USE_AVX_SIMD
         union {
             double results[4];
@@ -249,28 +284,28 @@ struct alignas(32) Array2D<double, NX, NY> {
         int y4 = clamp<int>(y+2, 0, NY - 1);
         double values[4][4] = {
             {
-                data[y1][x1],
-                data[y1][x2],
-                data[y1][x3],
-                data[y1][x4],
+                data[y1*NX + x1],
+                data[y1*NX + x2],
+                data[y1*NX + x3],
+                data[y1*NX + x4],
             },
             {
-                data[y2][x1],
-                data[y2][x2],
-                data[y2][x3],
-                data[y2][x4],
+                data[y2*NX + x1],
+                data[y2*NX + x2],
+                data[y2*NX + x3],
+                data[y2*NX + x4],
             },
             {
-                data[y3][x1],
-                data[y3][x2],
-                data[y3][x3],
-                data[y3][x4],
+                data[y3*NX + x1],
+                data[y3*NX + x2],
+                data[y3*NX + x3],
+                data[y3*NX + x4],
             },
             {
-                data[y4][x1],
-                data[y4][x2],
-                data[y4][x3],
-                data[y4][x4],
+                data[y4*NX + x1],
+                data[y4*NX + x2],
+                data[y4*NX + x3],
+                data[y4*NX + x4],
             },
         };
         __m256d dot0 = _mm256_mul_pd(usimd, _mm256_load_pd(values[0]));
@@ -513,8 +548,12 @@ struct alignas(32) Array2D<double, NX, NY> {
         return value;
     }
 
-    void extrapolate(Array2D<uint32_t, NX, NY>& intMask) {
+    void extrapolate(Array2D<uint32_t>& intMask) {
+        assert(NX == intMask.NX);
+        assert(NY == intMask.NY);
+
         auto Wu = Queue<vec2i>::create(4*NX*NY);
+        defer {Wu.free();};
         for (size_t j = 0; j < NY; j++) {
             for (size_t i = 0; i < NX; i++) {
                 if (intMask(i, j) != 0 && (
