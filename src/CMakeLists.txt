@@ -8,6 +8,12 @@ target_include_directories(fluid_sim
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+option(USE_AVX "Use AVX SIMD Instructions." ON)
+if (USE_AVX)
+    add_compile_definitions(USE_AVX_SIMD)
+    target_compile_options(fluid_sim PUBLIC -mavx -mfma)
+endif()
+
 # altlib
 target_include_directories(fluid_sim PUBLIC altlib)
 target_link_libraries(fluid_sim PUBLIC altlib)

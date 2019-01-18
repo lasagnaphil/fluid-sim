@@ -8,9 +8,6 @@ target_link_libraries(fluid_sim_demo PUBLIC altlib)
 target_link_libraries(fluid_sim_demo PUBLIC altmath)
 
 # SDL2
-if (MINGW)
-    set(SDL2_PATH "C:\\Libraries\\SDL2-2.0.8-MinGW\\x86_64-w64-mingw32")
-endif(MINGW)
 find_package(SDL2 REQUIRED)
 target_include_directories(fluid_sim_demo PRIVATE ${SDL2_INCLUDE_DIR})
 
