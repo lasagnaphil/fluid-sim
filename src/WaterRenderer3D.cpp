@@ -2,7 +2,7 @@
 // Created by lasagnaphil on 2018-09-17.
 //
 
-#include "WaterSim3D.h"
+#include "FluidSim3D.h"
 #include "WaterRenderer3D.h"
 
 #include <imgui.h>
@@ -58,7 +58,7 @@ constexpr float WaterRenderer3D::VEL_LINE_SCALE;
 constexpr size_t WaterRenderer3D::POINT_VERTEX_COUNT;
 constexpr size_t WaterRenderer3D::LINE_VERTEX_COUNT;
 
-void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
+void WaterRenderer3D::setup(FluidSim3D* sim, FirstPersonCamera* camera) {
     this->sim = sim;
 
     const auto EMPTY_COLOR = vec4f {0.0f, 0.0f, 0.0f, 1.0f};
@@ -74,16 +74,16 @@ void WaterRenderer3D::setup(WaterSim3D* sim, FirstPersonCamera* camera) {
     }
 
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
-        WaterSim3D::CellType cellType = sim->cell(i, j, k);
-        if (cellType == WaterSim3D::CellType::EMPTY) {
+        FluidSim3D::CellType cellType = sim->cell(i, j, k);
+        if (cellType == FluidSim3D::CellType::EMPTY) {
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i)] = EMPTY_COLOR;
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i) + 1] = EMPTY_COLOR;
         }
-        else if (cellType == WaterSim3D::CellType::FLUID) {
+        else if (cellType == FluidSim3D::CellType::FLUID) {
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i)] = FLUID_COLOR;
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i) + 1] = FLUID_COLOR;
         }
-        else if (cellType == WaterSim3D::CellType::SOLID) {
+        else if (cellType == FluidSim3D::CellType::SOLID) {
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i)] = SOLID_COLOR;
             vertexColors[2 * (k * SIZEY * SIZEX + j * SIZEX + i) + 1] = SOLID_COLOR;
         }
@@ -206,13 +206,13 @@ void WaterRenderer3D::drawUI() {
     static size_t curr_k = 0;
 
     ImGui::Begin("Simulation Data");
-    if (sim->stage == WaterSim3D::Stage::ADVECTION) {
+    if (sim->stage == FluidSim3D::Stage::ADVECTION) {
         ImGui::Text("Advection done.");
     }
-    else if (sim->stage == WaterSim3D::Stage::GRAVITY) {
+    else if (sim->stage == FluidSim3D::Stage::GRAVITY) {
         ImGui::Text("Gravity done.");
     }
-    else if (sim->stage == WaterSim3D::Stage::PROJECTION) {
+    else if (sim->stage == FluidSim3D::Stage::PROJECTION) {
         ImGui::Text("Projection done.");
     }
 
@@ -225,7 +225,7 @@ void WaterRenderer3D::drawUI() {
             for (size_t i = 0; i < SIZEX; i++) {
                 char fstr[32];
                 sprintf(fstr, "%6f", sim->p(i, SIZEY - 1 - j, curr_k));
-                ImGui::Text(fstr);
+                ImGui::Text("%s", fstr);
                 ImGui::NextColumn();
             }
             ImGui::Separator();
@@ -241,7 +241,7 @@ void WaterRenderer3D::drawUI() {
                 char fstr[32];
                 vec3d v = sim->mac.vel(i, SIZEY - 1 - j, curr_k);
                 sprintf(fstr, "%2.2f %2.2f %2.2f", v.x, v.y, v.z);
-                ImGui::Text(fstr);
+                ImGui::Text("%s", fstr);
                 ImGui::NextColumn();
             }
             ImGui::Separator();
@@ -255,8 +255,8 @@ void WaterRenderer3D::drawUI() {
 void WaterRenderer3D::updateWaterVoxelLocations() {
     waterVoxelLocations.size = 0;
     sim->mac.iterate([&](size_t i, size_t j, size_t k) {
-        WaterSim3D::CellType cellType = sim->cell(i, j, k);
-        if (cellType == WaterSim3D::CellType::FLUID) {
+        FluidSim3D::CellType cellType = sim->cell(i, j, k);
+        if (cellType == FluidSim3D::CellType::FLUID) {
             waterVoxelLocations.push(vec3f {i*CELL_SIZE, j*CELL_SIZE, k*CELL_SIZE});
         }
     });

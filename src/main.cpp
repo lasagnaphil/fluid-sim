@@ -6,7 +6,7 @@
 
 int main(int argc, char* argv[]) {
     App app;
-    app.init(vec2i {1600, 900}, App::Mode::Dim2);
+    app.init(vec2i {1600, 900});
     app.start();
     app.free();
     return 0;

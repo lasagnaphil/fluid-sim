@@ -1,16 +1,16 @@
 //
 // Created by lasagnaphil on 10/2/18.
 //
-#ifndef FLUID_SIM_WATERRENDERER2D_H
-#define FLUID_SIM_WATERRENDERER2D_H
+#ifndef FLUID_SIM_FLUIDRENDERER2D_H
+#define FLUID_SIM_FLUIDRENDERER2D_H
 
 #include <glad/glad.h>
 #include <StackVec.h>
 #include <imgui.h>
 
-#include "WaterSimSettings.h"
+#include "FluidSimSettings.h"
 #include "Shader.h"
-#include "WaterSim2D.h"
+#include "FluidSim2D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 #include "Camera2D.h"
@@ -24,14 +24,11 @@ static float origQuadVertices[12] = {
         1.0f, 0.0f,
 };
 
-class WaterRenderer2D {
-private:
-    static constexpr int SIZEX = WaterSimSettings::Dim2D::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::Dim2D::SIZEY;
-    static constexpr int PARTICLES_PER_CELL_SQRT = WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT;
-#define SQR(x) ((x)*(x))
-    static constexpr int PARTICLES_PER_CELL = SQR(WaterSimSettings::Dim2D::PARTICLES_PER_CELL_SQRT);
-#undef SQR
+struct FluidRenderer2D {
+    int sizeX;
+    int sizeY;
+    int particlesPerCellSqrt;
+    int particlesPerCell;
 
     GLuint waterCellVAO;
     GLuint solidCellVAO;
@@ -53,21 +50,21 @@ private:
     GLuint particleVelVBO;
 
     vec2f quadVertices[6];
-    StackVec<vec2f, SIZEX*SIZEY> waterCellLocations = {};
-    StackVec<vec2f, SIZEX*SIZEY> solidCellLocations = {};
-    StackVec<vec2f, SIZEX*SIZEY> pressureCellLocations = {};
-    StackVec<vec2f, 2*SIZEX*SIZEY> cellVels = {};
-    StackVec<float, SIZEX*SIZEY> pressureCellValues = {};
-    StackVec<vec2f, SIZEX*SIZEY> allCellLocations = {};
-    StackVec<float, SIZEX*SIZEY> phiCellValues = {};
+    Vec<vec2f> waterCellLocations = {};
+    Vec<vec2f> solidCellLocations = {};
+    Vec<vec2f> pressureCellLocations = {};
+    Vec<vec2f> cellVels = {};
+    Vec<float> pressureCellValues = {};
+    Vec<vec2f> allCellLocations = {};
+    Vec<float> phiCellValues = {};
 
-    StackVec<vec2f, 2*PARTICLES_PER_CELL*SIZEX*SIZEY> particleVelLines = {};
+    Vec<vec2f> particleVelLines = {};
 
     Shader cellShader;
     Shader particleShader;
     Shader cellFieldShader;
 
-    WaterSim2D* sim;
+    FluidSim2D* sim;
     Camera2D* camera;
 
     bool renderParticles = true;
@@ -82,10 +79,11 @@ private:
     static const char* cellFieldVS;
     static const char* cellFS;
 
-public:
-    static constexpr float VEL_SIZE = 0.01f;
+    static FluidRenderer2D create(FluidSim2D* sim, Camera2D* camera);
 
-    void setup(WaterSim2D* sim, Camera2D* camera);
+    void free();
+
+    void setup();
 
     void update();
 
@@ -94,8 +92,6 @@ public:
     void drawUI();
 
     void updateBuffers();
-
-    // void createWaterMesh();
 };
 
-#endif //FLUID_SIM_WATERRENDERER2D_H
+#endif //FLUID_SIM_FLUIDRENDERER2D_H

@@ -22,10 +22,10 @@
 template <typename T>
 struct Array2D {
     T* data = nullptr;
-    size_t NX;
-    size_t NY;
+    int NX;
+    int NY;
 
-    static Array2D create(size_t nx, size_t ny) {
+    static Array2D create(int nx, int ny) {
         T* p = new T[nx*ny];
         memset(p, 0, sizeof(T) * nx * ny);
         return {p, nx, ny};
@@ -39,12 +39,12 @@ struct Array2D {
         memcpy(data, arr.data, sizeof(T) * NX * NY);
     }
 
-    T& operator()(size_t i, size_t j) {
+    T& operator()(int i, int j) {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
         return data[j*NX + i];
     }
 
-    const T& operator()(size_t i, size_t j) const {
+    const T& operator()(int i, int j) const {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
         return data[j*NX + i];
     }
@@ -57,11 +57,11 @@ struct Array2D {
 template <>
 struct Array2D<double> {
     double* data = nullptr;
-    size_t NX;
-    size_t NY;
+    int NX;
+    int NY;
 
-    static Array2D<double> create(size_t nx, size_t ny) {
-        size_t nbytes = sizeof(double)*nx*ny;
+    static Array2D<double> create(int nx, int ny) {
+        int nbytes = sizeof(double)*nx*ny;
         double* p = (double*) aligned_malloc(32, nbytes);
         if (p) {
             memset(p, 0, nbytes);
@@ -83,17 +83,17 @@ struct Array2D<double> {
         memcpy(data, arr.data, sizeof(double) * NX * NY);
     }
 
-    double& operator()(size_t i, size_t j) {
+    double& operator()(int i, int j) {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
         return data[j*NX + i];
     }
 
-    const double& operator()(size_t i, size_t j) const {
+    const double& operator()(int i, int j) const {
         assert(i >= 0 && i < NX && j >= 0 && j < NY);
         return data[j*NX + i];
     }
 
-    bool isInBounds(size_t i, size_t j) const {
+    bool isInBounds(int i, int j) const {
         return i >= 0 && i < NX && j >= 0 && j < NY;
     }
 
@@ -107,14 +107,14 @@ struct Array2D<double> {
 
         auto result = Array2D<double>::create(NX, NY);
 #ifdef USE_AVX_SIMD
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
             __m256d bsimd = _mm256_load_pd((double*)rhs.data+ i);
             _mm256_store_pd((double*)result.data + i, _mm256_sub_pd(asimd, bsimd));
         }
 #else
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++)
                 result(i,j) = (*this)(i,j) - rhs(i,j);
 #endif
         return result;
@@ -125,15 +125,15 @@ struct Array2D<double> {
         assert(NY == rhs.NY);
 
 #ifdef USE_AVX_SIMD
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
             __m256d bsimd = _mm256_load_pd((double*)rhs.data + i);
             asimd = _mm256_add_pd(asimd, bsimd);
             _mm256_store_pd((double*)data + i, asimd);
         }
 #else
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++)
                 (*this)(i,j) += rhs(i,j);
 #endif
         return *this;
@@ -144,15 +144,15 @@ struct Array2D<double> {
         assert(NY == rhs.NY);
 
 #ifdef USE_AVX_SIMD
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)data + i);
             __m256d bsimd = _mm256_load_pd((double*)rhs.data + i);
             asimd = _mm256_div_pd(asimd, bsimd);
             _mm256_store_pd((double*)data + i, asimd);
         }
 #else
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++)
                 (*this)(i,j) /= rhs(i,j);
 #endif
         return *this;
@@ -162,8 +162,8 @@ struct Array2D<double> {
         assert(NX == rhs.NX);
         assert(NY == rhs.NY);
 
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX; i++) {
+        for (int j = 0; j < NY; j++) {
+            for (int i = 0; i < NX; i++) {
                 if (rhs(i,j) != 0.0)
                     (*this)(i,j) /= rhs(i,j);
                 else
@@ -179,7 +179,7 @@ struct Array2D<double> {
         assert(NY == c.NY);
 
 #ifdef USE_AVX_SIMD
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d asimd = _mm256_load_pd((double*)a.data + i);
             __m256d bsimd = _mm256_set1_pd(b);
             __m256d csimd = _mm256_load_pd((double*)c.data + i);
@@ -187,8 +187,8 @@ struct Array2D<double> {
             _mm256_store_pd((double*)this->data + i, res);
         }
 #else
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++)
                 (*this)(i,j) = a(i,j) + b * c(i,j);
 #endif
     }
@@ -203,7 +203,7 @@ struct Array2D<double> {
             __m256d results_simd;
         };
         results_simd = _mm256_setzero_pd();
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d a = _mm256_load_pd((double*)data + i);
             __m256d b = _mm256_load_pd((double*)rhs.data + i);
             results_simd = _mm256_add_pd(results_simd, _mm256_mul_pd(a, b));
@@ -211,8 +211,8 @@ struct Array2D<double> {
         return (results[0] + results[1]) + (results[2] + results[3]);
 #else
         double result = {};
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++)
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++)
                 result += (*this)(i,j)*rhs(i,j);
         return result;
 #endif
@@ -226,7 +226,7 @@ struct Array2D<double> {
             __m256d results_simd;
         };
         results_simd = _mm256_setzero_pd();
-        for (size_t i = 0; i < NY*NX; i += 4) {
+        for (int i = 0; i < NY*NX; i += 4) {
             __m256d lhs = _mm256_load_pd((double*)data + i);
             __m256d lhsabs = _mm256_max_pd(_mm256_sub_pd(_mm256_setzero_pd(), lhs), lhs);
             results_simd = _mm256_max_pd(results_simd, lhsabs);
@@ -234,8 +234,8 @@ struct Array2D<double> {
         return max(max(results[0], results[1]), max(results[2], results[3]));
 #else
         double result = {};
-        for (size_t j = 0; j < NY; j++)
-            for (size_t i = 0; i < NX; i++) {
+        for (int j = 0; j < NY; j++)
+            for (int i = 0; i < NX; i++) {
                 if (abs((*this)(i,j)) > result) result = abs((*this)(i,j));
             }
         return result;
@@ -554,15 +554,15 @@ struct Array2D<double> {
 
         auto Wu = Queue<vec2i>::create(4*NX*NY);
         defer {Wu.free();};
-        for (size_t j = 0; j < NY; j++) {
-            for (size_t i = 0; i < NX; i++) {
+        for (int j = 0; j < NY; j++) {
+            for (int i = 0; i < NX; i++) {
                 if (intMask(i, j) != 0 && (
                         (i > 0 && intMask(i-1, j) == 0) ||
                         (i < NX - 1 && intMask(i+1, j) == 0) ||
                         (j > 0 && intMask(i, j-1) == 0) ||
                         (j < NY - 1 && intMask(i, j+1) == 0))) {
                     intMask(i, j) = 1;
-                    Wu.enq(vec2i {(int)i, (int)j});
+                    Wu.enq(vec2i {i, j});
                 }
             }
         }

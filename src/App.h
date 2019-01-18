@@ -7,14 +7,10 @@
 
 #include <SDL.h>
 
-#include "FirstPersonCamera.h"
-#include "Camera2D.h"
 #include "vec2d.h"
-
-struct WaterSim2D;
-struct WaterRenderer2D;
-struct WaterSim3D;
-struct WaterRenderer3D;
+#include "Camera2D.h"
+#include "FluidSim2D.h"
+#include "FluidRenderer2D.h"
 
 struct AppSettings {
     vec2i screenSize = {800, 600};
@@ -26,7 +22,7 @@ struct App {
     };
     static constexpr int MAX_SHADERS = 16;
 
-    void init(vec2i screenSize, Mode mode);
+    void init(vec2i screenSize);
     void free();
     void start();
     void screenshot(const char* filename);
@@ -36,15 +32,11 @@ struct App {
 
     bool quit = false;
     AppSettings settings;
-    Mode mode;
 
-    FirstPersonCamera fpsCamera;
     Camera2D camera2d;
 
-    WaterSim2D* waterSim2D;
-    WaterRenderer2D* waterRenderer2D;
-    WaterSim3D* waterSim3D;
-    WaterRenderer3D* waterRenderer3D;
+    FluidSim2D fluidSim2D;
+    FluidRenderer2D fluidRenderer2D;
 };
 
 #endif //FLUID_SIM_APP_H

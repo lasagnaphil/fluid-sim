@@ -14,9 +14,9 @@
 
 #include "InputManager.h"
 
-#include "WaterSim3D.h"
-#include "WaterSim2D.h"
-#include "WaterRenderer2D.h"
+#include "FluidSim3D.h"
+#include "FluidSim2D.h"
+#include "FluidRenderer2D.h"
 #include "WaterRenderer3D.h"
 
 static void sdl_die(const char* message) {
@@ -63,10 +63,8 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id, GLenum severi
     }
 }
 
-void App::init(vec2i screenSize, Mode mode) {
+void App::init(vec2i screenSize) {
     settings.screenSize = screenSize;
-    this->mode = mode;
-
     if (SDL_Init(SDL_INIT_VIDEO)) {
         sdl_die("Couldn't initialize SDL");
     }
@@ -134,35 +132,48 @@ void App::init(vec2i screenSize, Mode mode) {
     ImGui::StyleColorsDark();
 
     // load systems
-    if (mode == Mode::Dim2) {
-        waterSim2D = new WaterSim2D();
-        waterSim2D->setup(128, 128, WaterSimSettings::Dim2D::DT, WaterSimSettings::Dim2D::DX, WaterSimSettings::Dim2D::DR, 997.0, -9.81);
-        camera2d = Camera2D::create(&settings, aml::toFloat(waterSim2D->getGridCenter()));
-        camera2d.zoom = 64.0f * (0.001 / waterSim2D->dx);
-        waterRenderer2D = new WaterRenderer2D();
-        waterRenderer2D->setup(waterSim2D, &camera2d);
+    FluidSim2DConfig config = {};
+
+    config.sizeX = 128;
+    config.sizeY = 128;
+    config.particlesPerCellSqrt = 2;
+    config.dt = 0.005;
+    config.dx = 0.01;
+    config.rho = 997.0;
+    config.gravityX = 0.0;
+    config.gravityY = -9.81;
+    config.mode = FS_PICFLIP;
+    config.picFlipAlpha = 1.0;
+    config.initialValues = new FluidCellType[config.sizeX*config.sizeY];
+
+    for (size_t j = 0; j < config.sizeY; j++) {
+        for (size_t i = 0; i < config.sizeX; i++) {
+            if (i == 0 || i == config.sizeX - 1 ||
+                j == 0 || j == config.sizeY - 1) {
+                config.initialValues[i*config.sizeY + j] = FS_SOLID;
+            }
+            else if (i + j < config.sizeY * 3 / 4) {
+                config.initialValues[i*config.sizeY + j] = FS_FLUID;
+            }
+            else {
+                config.initialValues[i*config.sizeY + j] = FS_EMPTY;
+            }
+        }
     }
-    else if (mode == Mode::Dim3) {
-        waterSim3D = new WaterSim3D();
-        waterSim3D->setup();
-        fpsCamera = FirstPersonCamera::create(&settings);
-        fpsCamera.transform.pos = vec4f {0.5f, 0.5f, 3.0f, 0.f};
-        waterRenderer3D = new WaterRenderer3D();
-        waterRenderer3D->setup(waterSim3D, &fpsCamera);
-    }
+
+    fluidSim2D = FluidSim2D::create(config);
+    camera2d = Camera2D::create(&settings, aml::toFloat(fluidSim2D.getGridCenter()));
+    camera2d.zoom = 64.0f * (0.001 / fluidSim2D.dx);
+    fluidRenderer2D = FluidRenderer2D::create(&fluidSim2D, &camera2d);
+    fluidRenderer2D.setup();
+
+    delete[] config.initialValues;
 }
 
 void App::free() {
-    if (mode == Mode::Dim2) {
-        waterSim2D->saveStats();
-        waterSim2D->free();
-        delete waterSim2D;
-        delete waterRenderer2D;
-    }
-    else if (mode == Mode::Dim3) {
-        delete waterSim3D;
-        delete waterRenderer3D;
-    }
+    fluidSim2D.saveStats();
+    fluidSim2D.free();
+    fluidRenderer2D.free();
     SDL_DestroyWindow(window);
 }
 
@@ -200,16 +211,9 @@ void App::start() {
         lastFrameTime = frameTime;
 
         InputManager::get()->update();
-        if (mode == Mode::Dim2) {
-            camera2d.update(dt);
-            waterSim2D->update();
-            waterRenderer2D->update();
-        }
-        else if (mode == Mode::Dim3) {
-            fpsCamera.update(dt);
-            waterSim3D->update();
-            waterRenderer3D->update();
-        }
+        camera2d.update(dt);
+        fluidSim2D.update();
+        fluidRenderer2D.update();
 
         //
         // Render
@@ -224,22 +228,11 @@ void App::start() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // draw
-        if (mode == Mode::Dim2) {
-            waterRenderer2D->draw();
-        }
-        else if (mode == Mode::Dim3) {
-            waterRenderer3D->draw();
-        }
+        fluidRenderer2D.draw();
 
         // draw UI
-        if (mode == Mode::Dim2) {
-            waterRenderer2D->drawUI();
-            camera2d.drawUI();
-        }
-        else if (mode == Mode::Dim3) {
-            waterRenderer3D->drawUI();
-            fpsCamera.drawUI();
-        }
+        fluidRenderer2D.drawUI();
+        camera2d.drawUI();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -2,12 +2,12 @@
 // Created by lasagnaphil on 10/27/18.
 //
 
-#include "WaterRenderer2D.h"
+#include "FluidRenderer2D.h"
 
 #include <vec4f.h>
 #include "App.h"
 
-const char* WaterRenderer2D::particleVS = R"SHADER(
+const char* FluidRenderer2D::particleVS = R"SHADER(
 #version 330 core
 
 layout (location = 0) in vec2 inPos;
@@ -24,7 +24,7 @@ void main() {
 
 )SHADER";
 
-const char* WaterRenderer2D::cellVS = R"SHADER(
+const char* FluidRenderer2D::cellVS = R"SHADER(
 #version 330 core
 
 layout (location = 0) in vec2 inPos;
@@ -42,7 +42,7 @@ void main() {
 }
 )SHADER";
 
-const char* WaterRenderer2D::cellFieldVS = R"SHADER(
+const char* FluidRenderer2D::cellFieldVS = R"SHADER(
 #version 330 core
 
 layout (location = 0) in vec2 inPos;
@@ -62,7 +62,7 @@ void main() {
 }
 )SHADER";
 
-const char* WaterRenderer2D::cellFS = R"SHADER(
+const char* FluidRenderer2D::cellFS = R"SHADER(
 #version 330 core
 
 in vec4 color;
@@ -74,14 +74,28 @@ void main() {
 }
 )SHADER";
 
-void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
-    this->sim = sim;
-    this->camera = camera;
+FluidRenderer2D FluidRenderer2D::create(FluidSim2D *sim, Camera2D *camera) {
+    FluidRenderer2D ren;
+    ren.sim = sim;
+    ren.camera = camera;
+    int sizeX = ren.sizeX = sim->sizeX;
+    int sizeY = ren.sizeY = sim->sizeY;
+    ren.particlesPerCellSqrt = sim->particlesPerCellSqrt;
+    ren.particlesPerCell = sim->particlesPerCell;
 
-    const auto EMPTY_COLOR = vec4f {0.0f, 0.0f, 0.0f, 1.0f};
-    const auto FLUID_COLOR = vec4f {0.0f, 0.0f, 1.0f, 1.0f};
-    const auto SOLID_COLOR = vec4f {0.1f, 0.1f, 0.1f, 1.0f};
+    ren.waterCellLocations.reserve(sizeX*sizeY);
+    ren.solidCellLocations.reserve(sizeX*sizeY);
+    ren.pressureCellLocations.reserve(sizeX*sizeY);
+    ren.cellVels.reserve(2*sizeX*sizeY);
+    ren.pressureCellValues.reserve(sizeX*sizeY);
+    ren.allCellLocations.reserve(sizeX*sizeY);
+    ren.phiCellValues.reserve(sizeX*sizeY);
+    ren.particleVelLines.reserve(2*ren.particlesPerCell*sizeX*sizeY);
 
+    return ren;
+}
+
+void FluidRenderer2D::setup() {
     cellShader = Shader::fromStr(cellVS, cellFS);
     particleShader = Shader::fromStr(particleVS, cellFS);
     cellFieldShader = Shader::fromStr(cellFieldVS, cellFS);
@@ -92,9 +106,9 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
         quadVertices[i].y *= sim->dx;
     }
 
-    allCellLocations.size = SIZEX*SIZEY;
+    allCellLocations.size = sizeX*sizeY;
     sim->iterate([&](size_t i, size_t j) {
-        allCellLocations[j*SIZEX + i] = vec2f{(float)i,(float)j} * (float)sim->dx;
+        allCellLocations[j*sizeX + i] = vec2f{(float)i,(float)j} * (float)sim->dx;
     });
 
     updateBuffers();
@@ -125,7 +139,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, waterCellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * SIZEX*SIZEY, waterCellLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * sizeX*sizeY, waterCellLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
     glVertexAttribDivisor(1, 1);
@@ -137,7 +151,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, solidCellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * SIZEX*SIZEY, solidCellLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * sizeX*sizeY, solidCellLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
     glVertexAttribDivisor(1, 1);
@@ -145,7 +159,7 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glBindVertexArray(cellVelVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, cellVelVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*SIZEX*SIZEY, cellVels.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*sizeX*sizeY, cellVels.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
@@ -156,13 +170,13 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, pressureCellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * SIZEX*SIZEY, pressureCellLocations.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * sizeX*sizeY, pressureCellLocations.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
     glVertexAttribDivisor(1, 1);
 
     glBindBuffer(GL_ARRAY_BUFFER, pressureCellValueVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * SIZEX*SIZEY, pressureCellValues.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * sizeX*sizeY, pressureCellValues.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), 0);
     glVertexAttribDivisor(2, 1);
@@ -174,13 +188,13 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
     glBindBuffer(GL_ARRAY_BUFFER, allCellOffsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * SIZEX*SIZEY, allCellLocations.data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * sizeX*sizeY, allCellLocations.data, GL_STATIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
     glVertexAttribDivisor(1, 1);
 
     glBindBuffer(GL_ARRAY_BUFFER, phiCellValueVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * SIZEX*SIZEY, phiCellValues.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * sizeX*sizeY, phiCellValues.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), 0);
     glVertexAttribDivisor(2, 1);
@@ -188,14 +202,14 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     glBindVertexArray(particleVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, particleVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*PARTICLES_PER_CELL*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*particlesPerCell*sizeX*sizeY, particleVelLines.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(vec2f), 0);
 
     glBindVertexArray(particleVelVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, particleVelVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*PARTICLES_PER_CELL*SIZEX*SIZEY, particleVelLines.data, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vec2f) * 2*particlesPerCell*sizeX*sizeY, particleVelLines.data, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vec2f), 0);
 
@@ -206,7 +220,18 @@ void WaterRenderer2D::setup(WaterSim2D *sim, Camera2D *camera) {
     camera->addShader(&cellFieldShader);
 }
 
-void WaterRenderer2D::update() {
+void FluidRenderer2D::free() {
+    waterCellLocations.free();
+    solidCellLocations.free();
+    pressureCellLocations.free();
+    cellVels.free();
+    pressureCellValues.free();
+    allCellLocations.free();
+    phiCellValues.free();
+    particleVelLines.free();
+}
+
+void FluidRenderer2D::update() {
     if (!sim->rendered) {
         updateBuffers();
         if (renderCells) {
@@ -272,13 +297,13 @@ void WaterRenderer2D::update() {
         normMousePos.y *= -1;
         vec2f gridPos = (normMousePos / camera->pixelsPerMeter / camera->zoom + camera->pos) / (float)sim->dx;
 
-        if (gridPos.x >= 1 && gridPos.x <= SIZEX - 2 && gridPos.y >= 1 && gridPos.y <= SIZEY - 2) {
+        if (gridPos.x >= 1 && gridPos.x <= sizeX - 2 && gridPos.y >= 1 && gridPos.y <= sizeY - 2) {
             printf("pos: (%f, %f), velIncrease: (%f, %f)\n", gridPos.x, gridPos.y, velIncrease.x, velIncrease.y);
-            size_t ux = aml::clamp<size_t>(gridPos.x, 1, SIZEX - 2);
-            size_t uy = aml::clamp<size_t>(gridPos.y - 0.5, 1, SIZEY - 2);
+            size_t ux = aml::clamp<size_t>(gridPos.x, 1, sizeX - 2);
+            size_t uy = aml::clamp<size_t>(gridPos.y - 0.5, 1, sizeY - 2);
             sim->mac.u(ux, uy) += velIncrease.x;
-            size_t vx = aml::clamp<size_t>(gridPos.x - 0.5, 1, SIZEX - 2);
-            size_t vy = aml::clamp<size_t>(gridPos.y, 1, SIZEY - 2);
+            size_t vx = aml::clamp<size_t>(gridPos.x - 0.5, 1, sizeX - 2);
+            size_t vy = aml::clamp<size_t>(gridPos.y, 1, sizeY - 2);
             sim->mac.v(vx, vy) += velIncrease.y;
         }
     }
@@ -298,7 +323,7 @@ void WaterRenderer2D::update() {
 
 }
 
-void WaterRenderer2D::draw() {
+void FluidRenderer2D::draw() {
     if (renderCells) {
         cellShader.use();
         cellShader.setVector4("uniColor", vec4f {0.0f, 0.0f, 1.0f, 1.0f});
@@ -347,7 +372,7 @@ void WaterRenderer2D::draw() {
 
 }
 
-void WaterRenderer2D::drawUI() {
+void FluidRenderer2D::drawUI() {
     ImGui::Begin("Water Simulation");
     if (ImGui::CollapsingHeader("Parameters")) {
         float gravity[2];
@@ -357,13 +382,9 @@ void WaterRenderer2D::drawUI() {
         sim->gravity.x = gravity[0];
         sim->gravity.y = gravity[1];
 
-        ImGui::Checkbox("Gravity oscillation toggle", &sim->oscillateGravity);
-        if (sim->oscillateGravity) {
-            ImGui::SliderFloat("Gravity Amplitude", &sim->oscillateGravityAmp, 0.1f, 10.0f);
-            ImGui::SliderFloat("Gravity Period", &sim->oscillateGravityPeriod, 0.1f, 10.0f);
-        }
-
-        ImGui::SliderFloat("PIC/Flip Interpolation Factor", &sim->picFlipAlpha, 0.0f, 1.0f);
+        float picFlipAlpha = sim->picFlipAlpha;
+        ImGui::SliderFloat("PIC/Flip Interpolation Factor", &picFlipAlpha, 0.0f, 1.0f);
+        sim->picFlipAlpha = picFlipAlpha;
     }
     if (ImGui::CollapsingHeader("Data")) {
         ImGui::Text("Current frame: %f", sim->currentTime);
@@ -403,16 +424,16 @@ void WaterRenderer2D::drawUI() {
     ImGui::End();
 }
 
-void WaterRenderer2D::updateBuffers() {
+void FluidRenderer2D::updateBuffers() {
     if (renderCells) {
         waterCellLocations.size = 0;
         solidCellLocations.size = 0;
         sim->iterate([&](size_t i, size_t j) {
-            WaterSim2D::CellType cellType = sim->cell(i,j);
-            if (cellType == WaterSim2D::CellType::FLUID) {
+            FluidCellType cellType = sim->cell(i,j);
+            if (cellType == FS_FLUID) {
                 waterCellLocations.push(vec2f {(float)(i * sim->dx), (float)(j * sim->dx)});
             }
-            else if (cellType == WaterSim2D::CellType::SOLID) {
+            else if (cellType == FS_SOLID) {
                 solidCellLocations.push(vec2f {(float)(i * sim->dx), (float)(j * sim->dx)});
             }
         });

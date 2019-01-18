@@ -63,6 +63,7 @@ void PerformanceCounter::renderUI() {
 void PerformanceCounter::free() {
     samples.free();
     average.free();
+    averageStore.free();
 }
 
 void PerformanceCounter::saveToFile(const char* filename) {

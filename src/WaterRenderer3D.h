@@ -2,24 +2,24 @@
 // Created by lasagnaphil on 2018-09-17.
 //
 
-#ifndef FLUID_SIM_WATERRENDERER3D_H
-#define FLUID_SIM_WATERRENDERER3D_H
+#ifndef FLUID_SIM_FLUIDRENDERER3D_H
+#define FLUID_SIM_FLUIDRENDERER3D_H
 
 #include <cstddef>
 #include <glad/glad.h>
 #include <StackVec.h>
 
 #include "Shader.h"
-#include "WaterSimSettings.h"
+#include "FluidSimSettings.h"
 
 struct FirstPersonCamera;
-struct WaterSim3D;
+struct FluidSim3D;
 
 class WaterRenderer3D {
-    static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
-    static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
-    static constexpr int ENABLE_DEBUG_UI = WaterSimSettings::Dim3D::ENABLE_DEBUG_UI;
+    static constexpr int SIZEX = FluidSimSettings::Dim3D::SIZEX;
+    static constexpr int SIZEY = FluidSimSettings::Dim3D::SIZEY;
+    static constexpr int SIZEZ = FluidSimSettings::Dim3D::SIZEZ;
+    static constexpr int ENABLE_DEBUG_UI = FluidSimSettings::Dim3D::ENABLE_DEBUG_UI;
 
     enum class DrawMode {
         POINT, LINE, VOXEL
@@ -46,10 +46,10 @@ class WaterRenderer3D {
     Shader lineShader;
     Shader voxelShader;
 
-    WaterSim3D* sim;
+    FluidSim3D* sim;
 
 public:
-    void setup(WaterSim3D* sim, FirstPersonCamera* camera);
+    void setup(FluidSim3D* sim, FirstPersonCamera* camera);
     void update();
     void draw();
     void drawUI();
@@ -59,4 +59,4 @@ private:
 };
 
 
-#endif //FLUID_SIM_WATERRENDERER3D_H
+#endif //FLUID_SIM_FLUIDRENDERER3D_H

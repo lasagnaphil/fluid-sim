@@ -2,17 +2,17 @@
 // Created by lasagnaphil on 9/13/18.
 //
 
-#ifndef FLUID_SIM_WATERSIM_H
+#ifndef FLUID_SIM_FLUIDSIM_H
 
 #include <glad/glad.h>
 
-#include "WaterSimSettings.h"
+#include "FluidSimSettings.h"
 #include "MACGrid3D.h"
 
-struct WaterSim3D {
-    static constexpr int SIZEX = WaterSimSettings::Dim3D::SIZEX;
-    static constexpr int SIZEY = WaterSimSettings::Dim3D::SIZEY;
-    static constexpr int SIZEZ = WaterSimSettings::Dim3D::SIZEZ;
+struct FluidSim3D {
+    static constexpr int SIZEX = FluidSimSettings::Dim3D::SIZEX;
+    static constexpr int SIZEY = FluidSimSettings::Dim3D::SIZEY;
+    static constexpr int SIZEZ = FluidSimSettings::Dim3D::SIZEZ;
 
     template <typename T>
     using Grid3D = Array3D<T, SIZEX, SIZEY, SIZEZ>;
@@ -55,4 +55,4 @@ struct WaterSim3D {
     vec3d clampPos(vec3d x);
 };
 
-#endif //FLUID_SIM_WATERSIM_H
+#endif //FLUID_SIM_FLUIDSIM_H

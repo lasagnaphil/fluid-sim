@@ -2,13 +2,13 @@
 // Created by lasagnaphil on 9/13/18.
 //
 #include <time.h>
-#include "WaterSim3D.h"
+#include "FluidSim3D.h"
 #include "FirstPersonCamera.h"
 #include "InputManager.h"
 #include "Defer.h"
 #include "log.h"
 
-void WaterSim3D::setup() {
+void FluidSim3D::setup() {
     mac.iterate([&](size_t i, size_t j, size_t k) {
         if (i == 0 || i == SIZEX - 1 ||
             j == 0 || j == SIZEY - 1 ||
@@ -24,7 +24,7 @@ void WaterSim3D::setup() {
     });
 }
 
-vec3d WaterSim3D::clampPos(vec3d x) {
+vec3d FluidSim3D::clampPos(vec3d x) {
     vec3d clamped;
     clamped.x = aml::clamp<double>(x.x, 0.0, SIZEX);
     clamped.y = aml::clamp<double>(x.y, 0.0, SIZEY);
@@ -32,7 +32,7 @@ vec3d WaterSim3D::clampPos(vec3d x) {
     return clamped;
 }
 
-void WaterSim3D::runFrame() {
+void FluidSim3D::runFrame() {
     applyAdvection();
     applyGravity();
     applyProjection();
@@ -40,7 +40,7 @@ void WaterSim3D::runFrame() {
     rendered = false;
 }
 
-void WaterSim3D::update() {
+void FluidSim3D::update() {
     static int nextStage = 0;
     auto inputMgr = InputManager::get();
     if (inputMgr->isKeyEntered(SDL_SCANCODE_RETURN)) {
@@ -64,7 +64,7 @@ void WaterSim3D::update() {
     }
 }
 
-void WaterSim3D::debugPrint() {
+void FluidSim3D::debugPrint() {
     log_info("Printing water sim states: ");
     for (size_t i = 0; i < SIZEX; i++) {
         for (size_t j = 0; j < SIZEY; j++) {
@@ -76,7 +76,7 @@ void WaterSim3D::debugPrint() {
     }
 }
 
-void WaterSim3D::applyAdvection() {
+void FluidSim3D::applyAdvection() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
         vec3d u_pos = vec3d {(double)i, (double)j + 0.5, (double)k + 0.5};
         vec3d x_mid = u_pos - 0.5 * dt * mac.velU(i, j, k);
@@ -100,7 +100,7 @@ void WaterSim3D::applyAdvection() {
     });
 }
 
-void WaterSim3D::applyGravity() {
+void FluidSim3D::applyGravity() {
     mac.iterateU([&](size_t i, size_t j, size_t k) {
         mac.u(i,j,k) += dt * gravity.x;
     });
@@ -112,7 +112,7 @@ void WaterSim3D::applyGravity() {
     });
 }
 
-void WaterSim3D::applyProjection() {
+void FluidSim3D::applyProjection() {
     auto gridStack = Vec<Grid3D<double>>::create(10);
 
     auto& Adiag = gridStack.newItem();
@@ -320,7 +320,7 @@ inline double randf() {
     return ((double)rand()/(double)RAND_MAX) * 0.5;
 }
 
-void WaterSim3D::updateCells() {
+void FluidSim3D::updateCells() {
     srand(time(NULL));
     Grid3D<CellType>* oldCell = new Grid3D<CellType>();
     defer {delete oldCell;};
