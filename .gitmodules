@@ -1,6 +1,6 @@
 [submodule "deps/altlib"]
 	path = deps/altlib
-	url = git@github.com:lasagnaphil/altlib.git
+	url = https://github.com/lasagnaphil/altlib.git
 [submodule "deps/altmath"]
 	path = deps/altmath
-	url = git@github.com:lasagnaphil/altmath.git
+	url = https://github.com/lasagnaphil/altmath.git
