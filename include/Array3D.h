@@ -12,51 +12,60 @@
 #include <math_utils.h>
 #include <vec3.h>
 
-template <typename T, size_t NX, size_t NY, size_t NZ>
+template <typename T>
 struct Array3D {
-    T data[NZ][NY][NX] = {};
+    T* data;
+    int NX, NY, NZ;
+
+    static Array3D create(int nx, int ny, int nz) {
+        return {new T[nx*ny*nz], nx, ny, nz};
+    }
+
+    void free() {
+        delete[] data;
+    }
 
     void copyFrom(const Array3D& arr) {
         memcpy(data, arr.data, sizeof(T)*NX*NY*NZ);
     }
 
-    T& operator()(size_t i, size_t j, size_t k) {
-        return data[k][j][i];
+    T& operator()(int i, int j, int k) {
+        return data[k*NY*NX + j*NX + i];
     }
-    const T& operator()(size_t i, size_t j, size_t k) const {
-        return data[k][j][i];
+    const T& operator()(int i, int j, int k) const {
+        return data[k*NY*NX + j*NX + i];
     }
 
     Array3D& operator+=(const Array3D& rhs) {
-        for (size_t k = 0; k < NZ; k++)
-            for (size_t j = 0; j < NY + 1; j++)
-                for (size_t i = 0; i < NX; i++)
+        for (int k = 0; k < NZ; k++)
+            for (int j = 0; j < NY + 1; j++)
+                for (int i = 0; i < NX; i++)
                     (*this)(i,j,k) += rhs(i,j,k);
         return *this;
     }
 
     // TODO: FMA this
     void setMultiplyAdd(Array3D& a, T b, const Array3D& c) {
-        for (size_t k = 0; k < NZ; k++)
-            for (size_t j = 0; j < NY + 1; j++)
-                for (size_t i = 0; i < NX; i++)
+        for (int k = 0; k < NZ; k++)
+            for (int j = 0; j < NY + 1; j++)
+                for (int i = 0; i < NX; i++)
                     (*this)(i,j,k) = a(i,j,k) + b * c(i,j,k);
     }
 
     T innerProduct(const Array3D& rhs) const {
         T result = {};
-        for (size_t k = 0; k < NZ; k++)
-            for (size_t j = 0; j < NY + 1; j++)
-                for (size_t i = 0; i < NX; i++)
+        for (int k = 0; k < NZ; k++)
+            for (int j = 0; j < NY + 1; j++)
+                for (int i = 0; i < NX; i++)
                     result += (*this)(i,j,k)*rhs(i,j,k);
         return result;
     }
 
     T infiniteNorm() const {
         T result = {};
-        for (size_t k = 0; k < NZ; k++)
-            for (size_t j = 0; j < NY + 1; j++)
-                for (size_t i = 0; i < NX; i++) {
+        for (int k = 0; k < NZ; k++)
+            for (int j = 0; j < NY + 1; j++)
+                for (int i = 0; i < NX; i++) {
                     if (abs((*this)(i,j,k)) > result) result = abs((*this)(i,j,k));
                 }
         return result;
@@ -105,7 +114,7 @@ struct Array3D {
                 for (int i = 0; i < 4; i++)
                 {
                     int xp = aml::clamp<int>(x+i-1, 0, NX-1);
-                    r[j] += u[i] * data[zp][yp][xp];
+                    r[j] += u[i] * (*this)(zp,yp,xp);
                 }
                 q[k] += v[j] * r[j];
             }

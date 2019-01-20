@@ -18,10 +18,10 @@ struct PerformanceCounter {
     int currentFrame = 0;
     Vec<float[SampleCount]> samples = {};
     Vec<float> average = {};
-    float avgTimePerFrame;
+    float avgTimePerFrame = 0.0f;
     bool sampleFinished = false;
 
-    Vec<float> averageStore;
+    Vec<float> averageStore = {};
 
     static PerformanceCounter create(int numStages);
 

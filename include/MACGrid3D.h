@@ -9,63 +9,76 @@
 #include "Array3D.h"
 #include <math_utils.h>
 
-template <size_t SIZEX, size_t SIZEY, size_t SIZEZ>
 struct MACGrid3D {
-    Array3D<double, SIZEX + 1, SIZEY, SIZEZ> u = {};
-    Array3D<double, SIZEX, SIZEY + 1, SIZEZ> v = {};
-    Array3D<double, SIZEX, SIZEY, SIZEZ + 1> w = {};
+    Array3D<double> u, v, w;
+    int sizeX, sizeY, sizeZ;
+
+    static MACGrid3D create(int nx, int ny, int nz) {
+        return {
+            Array3D<double>::create(nx+1, ny, nz),
+            Array3D<double>::create(nx, ny+1, nz),
+            Array3D<double>::create(nx, ny, nz+1),
+            nx, ny, nz
+        };
+    }
+
+    void free() {
+        u.free();
+        v.free();
+        w.free();
+    }
 
     template <typename Fun>
     void iterateU(Fun f) {
-        for (size_t k = 0; k < SIZEZ; k++)
-            for (size_t j = 0; j < SIZEY; j++)
-                for (size_t i = 0; i < SIZEX + 1; i++)
+        for (int k = 0; k < sizeZ; k++)
+            for (int j = 0; j < sizeY; j++)
+                for (int i = 0; i < sizeX + 1; i++)
                     f(i, j, k);
     }
     template <typename Fun>
     void iterateV(Fun f) {
-        for (size_t k = 0; k < SIZEZ; k++)
-            for (size_t j = 0; j < SIZEY + 1; j++)
-                for (size_t i = 0; i < SIZEX; i++)
+        for (int k = 0; k < sizeZ; k++)
+            for (int j = 0; j < sizeY + 1; j++)
+                for (int i = 0; i < sizeX; i++)
                     f(i, j, k);
     }
 
     template <typename Fun>
     void iterateW(Fun f) {
-        for (size_t k = 0; k < SIZEZ + 1; k++)
-            for (size_t j = 0; j < SIZEY; j++)
-                for (size_t i = 0; i < SIZEX; i++)
+        for (int k = 0; k < sizeZ + 1; k++)
+            for (int j = 0; j < sizeY; j++)
+                for (int i = 0; i < sizeX; i++)
                     f(i, j, k);
     }
 
     template <typename Fun>
     void iterate(Fun f) {
-        for (size_t k = 0; k < SIZEZ; k++)
-            for (size_t j = 0; j < SIZEY; j++)
-                for (size_t i = 0; i < SIZEX; i++)
+        for (int k = 0; k < sizeZ; k++)
+            for (int j = 0; j < sizeY; j++)
+                for (int i = 0; i < sizeX; i++)
                     f(i, j, k);
     }
 
     template <typename Fun>
     void iterateBackwards(Fun f) {
-        for (size_t k = SIZEZ; k-- > 0;) {
-            for (size_t j = SIZEY; j-- > 0;) {
-                for (size_t i = SIZEX; i-- > 0;) {
+        for (int k = sizeZ; k-- > 0;) {
+            for (int j = sizeY; j-- > 0;) {
+                for (int i = sizeX; i-- > 0;) {
                     f(i, j, k);
                 }
             }
         }
     }
 
-    vec3d vel(size_t i, size_t j, size_t k) {
+    vec3d vel(int i, int j, int k) {
         return 0.5 * vec3d{
                 u(i+1,j,k) + u(i,j,k),
                 v(i,j+1,k) + v(i,j,k),
                 w(i,j,k+1) + w(i,j,k)};
     }
 
-    vec3d velU(size_t i, size_t j, size_t k) {
-        if (i > 0 && i < SIZEX)
+    vec3d velU(int i, int j, int k) {
+        if (i > 0 && i < sizeX)
             return vec3d{
                     u(i,j,k),
                     0.25 * (v(i-1,j,k) + v(i-1,j+1,k) + v(i,j,k) + v(i,j+1,k)),
@@ -85,8 +98,8 @@ struct MACGrid3D {
             };
     }
 
-    vec3d velV(size_t i, size_t j, size_t k) {
-        if (j > 0 && j < SIZEY)
+    vec3d velV(int i, int j, int k) {
+        if (j > 0 && j < sizeY)
             return vec3d{
                     0.25 * (u(i,j-1,k) + u(i,j,k) + u(i+1,j-1,k) + u(i+1,j,k)),
                     v(i,j,k),
@@ -106,8 +119,8 @@ struct MACGrid3D {
             };
     }
 
-    vec3d velW(size_t i, size_t j, size_t k) {
-        if (k > 0 && k < SIZEZ)
+    vec3d velW(int i, int j, int k) {
+        if (k > 0 && k < sizeZ)
             return vec3d{
                     0.25 * (u(i,j,k-1) + u(i+1,j,k-1) + u(i,j,k) + u(i+1,j,k)),
                     0.25 * (v(i,j,k-1) + v(i,j+1,k-1) + v(i,j,k) + v(i,j+1,k)),
@@ -149,7 +162,7 @@ struct MACGrid3D {
         return vec3d {velInterpU(pos), velInterpV(pos), velInterpW(pos)};
     }
 
-    double velDiv(size_t i, size_t j, size_t k) {
+    double velDiv(int i, int j, int k) {
         return (u(i+1,j,k) - u(i,j,k) + v(i,j+1,k) - v(i,j,k) + w(i,j,k+1) - w(i,j,k));
     }
 };
