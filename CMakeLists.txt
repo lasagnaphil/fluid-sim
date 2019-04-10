@@ -9,6 +9,10 @@ endif(CCACHE_FOUND)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+if(MINGW)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,-Bdynamic,--whole-archive")
+endif(MINGW)
 
 set(ALTLIB_DIR ${PROJECT_SOURCE_DIR}/deps/altlib)
 add_subdirectory(${ALTLIB_DIR})
