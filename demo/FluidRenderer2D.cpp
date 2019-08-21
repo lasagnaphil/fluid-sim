@@ -4,7 +4,7 @@
 
 #include "FluidRenderer2D.h"
 
-#include <vec4f.h>
+#include <vec4.h>
 #include "App.h"
 #include "FluidSim2D.h"
 

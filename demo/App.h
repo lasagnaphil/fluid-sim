@@ -7,7 +7,7 @@
 
 #include <SDL.h>
 
-#include "vec2d.h"
+#include "vec2.h"
 #include "Camera2D.h"
 #include "FluidSim2D.h"
 #include "FluidRenderer2D.h"

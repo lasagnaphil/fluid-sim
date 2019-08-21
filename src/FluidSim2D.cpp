@@ -4,7 +4,6 @@
 //
 
 #include <ctime>
-#include <vec2dx4.h>
 #include <math_utils.h>
 #include <Defer.h>
 #include <Queue.h>
@@ -595,7 +594,7 @@ void FluidSim2D::applyAdvection() {
         auto nextPos = pos + (2./9.)*dt*k1 + (3./9.)*dt*k2 + (4./9.)*dt*k3;
         nextPos = clampPos(nextPos);
 
-        if (isnan(pos.x) || isnan(pos.y)) {
+        if (std::isnan(pos.x) || std::isnan(pos.y)) {
             log_error("Advected position is NaN! pos=(%d, %d), idx=%d", pos.x, pos.y, i);
             exit(1);
         }

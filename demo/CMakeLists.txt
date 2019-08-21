@@ -3,6 +3,8 @@ file(GLOB DEMO_HEADERS *.h)
 
 add_executable(fluid_sim_demo ${DEMO_SOURCES} ${DEMO_HEADERS})
 
+# target_compile_definitions(fluid_sim_demo PUBLIC ALTMATH_USE_SIMD)
+
 target_link_libraries(fluid_sim_demo LINK_PUBLIC fluid_sim)
 target_link_libraries(fluid_sim_demo PUBLIC altlib)
 target_link_libraries(fluid_sim_demo PUBLIC altmath)

@@ -7,7 +7,7 @@
 
 #include <cstdint>
 #include <StackVec.h>
-#include <vec2d.h>
+#include <vec2.h>
 #include "Array2D.h"
 #include "MACGrid2D.h"
 #include "PerformanceCounter.h"

@@ -5,9 +5,9 @@
 #ifndef ALTLIB_TRANSFORM_H
 #define ALTLIB_TRANSFORM_H
 
-#include <vec4f.h>
-#include <quatf.h>
-#include <mat4f.h>
+#include <vec4.h>
+#include <quat.h>
+#include <mat4.h>
 #include <mat_utils.h>
 
 struct Transform {

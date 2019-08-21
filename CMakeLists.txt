@@ -18,9 +18,8 @@ set(ALTLIB_DIR ${PROJECT_SOURCE_DIR}/deps/altlib)
 add_subdirectory(${ALTLIB_DIR})
 
 set(ALTMATH_DIR ${PROJECT_SOURCE_DIR}/deps/altmath)
-set(altmath_build_tests OFF)
+set(altmath_build_tests OFF CACHE BOOL "Turn off tests.")
 add_subdirectory(${ALTMATH_DIR})
-
 
 set(LIBRARY_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 file(GLOB_RECURSE LIBRARY_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)

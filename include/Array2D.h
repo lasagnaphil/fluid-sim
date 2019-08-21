@@ -15,8 +15,7 @@
 
 #include <math_utils.h>
 #include <vec_utils.h>
-#include <vec2d.h>
-#include <vec2dx4.h>
+#include <vec2.h>
 #include "immintrin.h"
 
 template <typename T>
@@ -376,6 +375,7 @@ struct Array2D<double> {
         (*this)(x2, y2) += disp.x * disp.y * value;
     }
 
+    /*
     void linearDistribute(vec2dx4 pos, vec4d value) {
         auto floor = aml::toInt(aml::floor(pos));
         auto disp = vec2dx4 {pos.x - aml::toDouble(floor.x), pos.y - aml::toDouble(floor.y)};
@@ -397,6 +397,7 @@ struct Array2D<double> {
             (*this)(x2.v[i], y2.v[i]) += v4.v[i];
         }
     }
+     */
 
     double linearExtract(vec2d pos) {
         int ui = (int) pos.x;
