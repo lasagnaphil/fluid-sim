@@ -44,18 +44,20 @@ Linux (GCC or Clang)
 
 ```sh
 git clone --recursive https://github.com/lasagnaphil/fluid-sim
+cd fluid-sim
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+make fluid_sim_demo -j$(nproc)
 demo/fluid_sim_demo
 ```
 
 Windows (in MinGW-w64 shell)
 ```sh
 git clone --recursive https://github.com/lasagnaphil/fluid-sim
+cd fluid-sim
 mkdir build && cd build
 cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-mingw32-make
+mingw32-make fluid_sim_demo
 demo/fluid_sim_demo.exe
 ```
 
