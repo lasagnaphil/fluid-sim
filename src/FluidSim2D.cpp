@@ -5,6 +5,7 @@
 
 #include <ctime>
 #include <math_utils.h>
+#include <string>
 #include <Defer.h>
 #include <Queue.h>
 #include <log.h>
